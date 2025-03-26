@@ -1,0 +1,9 @@
+# Global variables for all hosts
+jenkins_http_port: 8080
+jenkins_admin_user: "{{ lookup('env', 'JENKINS_ADMIN_USER') }}"
+jenkins_admin_pass: "{{ lookup('env', 'JENKINS_ADMIN_PASS') }}"
+github_token: "{{ lookup('env', 'GITHUB_TOKEN') }}"
+ansible_vault_pass: "{{ lookup('env', 'ANSIBLE_VAULT_PASS') }}"
+vault_compartment_ocid: "ocid1.compartment.oc1..aaaaaaaad3fawdyyfugb2awpgpooaeszb37zryxbuqnmntef7aiu4qwvqgiq"
+vault_ocid: "ocid1.compartment.oc1..aaaaaaaad3fawdyyfugb2awpgpooaeszb37zryxbuqnmntef7aiu4qwvqgiq"
+key_ocid: "ocid1.keyversion.oc1.iad.ejt6hdnpaablm.a4egm7ry7biaa.abuwcljre63zvvblbqyc3scltl5kihlthukwznk3x4qczpv3uasvr43km4dq"

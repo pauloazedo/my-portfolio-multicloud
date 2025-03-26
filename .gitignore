@@ -39,3 +39,34 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Terraform
+terraform.tfstate
+terraform.tfstate.backup
+.terraform/
+terraform.tfvars
+
+# Ansible
+*.retry
+*.log
+*.vault
+ansible-vault.pass
+ansible/.vault_pass
+
+# Optional: ignore everything in inventory except static hosts file
+inventory/*
+!inventory/hosts.yml
+
+# Vaulted vars
+group_vars/*.vault.yml
+host_vars/*.vault.yml
+
+# Ignore roles only if dynamically pulled or not version-controlled
+roles/*/
+!roles/**/tasks/
+!roles/**/defaults/
+!roles/**/handlers/
+!roles/**/meta/
+!roles/**/templates/
+!roles/**/files/
+!roles/**/vars/

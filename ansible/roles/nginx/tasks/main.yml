@@ -1,0 +1,78 @@
+---
+- name: Install NGINX
+  apt:
+    name: nginx
+    state: present
+    update_cache: yes
+
+- name: Ensure NGINX is started and enabled
+  service:
+    name: nginx
+    state: started
+    enabled: yes
+
+- name: Install Certbot and NGINX plugin
+  apt:
+    name: "{{ item }}"
+    state: present
+    update_cache: yes
+  loop:
+    - certbot
+    - python3-certbot-nginx
+
+- name: Copy NGINX site config for Jenkins (UAT only)
+  template:
+    src: jenkins.conf.j2
+    dest: /etc/nginx/sites-available/jenkins
+  when: inventory_hostname in groups['uat']
+
+- name: Copy NGINX site config for UAT
+  template:
+    src: uat.conf.j2
+    dest: /etc/nginx/sites-available/uat
+  when: inventory_hostname in groups['uat']
+
+- name: Copy NGINX site config for PROD
+  template:
+    src: prod.conf.j2
+    dest: /etc/nginx/sites-available/prod
+  when: inventory_hostname in groups['prod']
+
+- name: Enable Jenkins config (UAT only)
+  file:
+    src: /etc/nginx/sites-available/jenkins
+    dest: /etc/nginx/sites-enabled/jenkins
+    state: link
+  when: inventory_hostname in groups['uat']
+
+- name: Enable UAT config
+  file:
+    src: /etc/nginx/sites-available/uat
+    dest: /etc/nginx/sites-enabled/uat
+    state: link
+  when: inventory_hostname in groups['uat']
+
+- name: Enable PROD config
+  file:
+    src: /etc/nginx/sites-available/prod
+    dest: /etc/nginx/sites-enabled/prod
+    state: link
+  when: inventory_hostname in groups['prod']
+
+- name: Remove default NGINX site if present
+  file:
+    path: /etc/nginx/sites-enabled/default
+    state: absent
+
+- name: Reload NGINX
+  service:
+    name: nginx
+    state: reloaded
+
+- name: Generate HTTPS certificate for uat.pauloazedo.us
+  command: certbot --nginx --non-interactive --agree-tos --email pauloazedo@pauloazedo.us -d uat.pauloazedo.us
+  when: inventory_hostname in groups['uat']
+
+- name: Generate HTTPS certificate for prod.pauloazedo.us
+  command: certbot --nginx --non-interactive --agree-tos --email pauloazedo@pauloazedo.us -d prod.pauloazedo.us
+  when: inventory_hostname in groups['prod']

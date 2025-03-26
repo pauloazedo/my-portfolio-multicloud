@@ -1,0 +1,10 @@
+{
+  "archives": {
+    "darwin_arm64": {
+      "hashes": [
+        "h1:5jsxVZa5nYIKUB+JjLbk+2x6az6XRmBg6mSql6aTP3U="
+      ],
+      "url": "terraform-provider-cloudflare_5.2.0_darwin_arm64.zip"
+    }
+  }
+}

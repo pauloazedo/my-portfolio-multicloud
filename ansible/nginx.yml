@@ -1,0 +1,12 @@
+---
+- name: Setup NGINX with HTTPS on both UAT and PROD
+  hosts: all
+  become: true
+  vars_files:
+    - vars/main.yml
+    - group_vars/all.yml
+  roles:
+    - role: hardening
+      tags: hardening
+    - role: nginx
+      tags: nginx

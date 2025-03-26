@@ -1,0 +1,10 @@
+---
+- name: Setup Jenkins container on UAT only
+  hosts: uat
+  become: true
+  vars_files:
+    - vars/main.yml
+    - group_vars/all.yml
+  roles:
+    - hardening
+    - jenkins
