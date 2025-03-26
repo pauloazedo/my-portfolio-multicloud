@@ -61,24 +61,32 @@ Brief description of the project's goal — showcasing your DevOps capabilities 
 
 ## Repository Structure
 
+<pre>
+
+<code>
+```text
 .
 ├── terraform/
 │   ├── main.tf
 │   ├── uat.tf
 │   ├── prod.tf
-│   └── variables.tf
+│   ├── variables.tf
 ├── ansible/
 │   ├── site.yml
+│   ├── group_vars/
 │   ├── roles/
 │   │   ├── hardening/
 │   │   ├── nginx/
 │   │   └── jenkins/
-│   └── group_vars/
 ├── portfolio/         # Next.js application
 │   ├── pages/
 │   ├── components/
-│   └── tailwind.config.js
-└── Jenkinsfile
+│   ├── tailwind.config.js
+│   └── Jenkinsfile
+```
+</code>
+
+</pre>
 
 ## Getting Started
 
