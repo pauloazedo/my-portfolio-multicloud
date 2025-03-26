@@ -63,30 +63,29 @@ Brief description of the project's goal — showcasing your DevOps capabilities 
 
 <pre>
 
-<code>
-```text
+```
 .
 ├── terraform/
 │   ├── main.tf
 │   ├── uat.tf
 │   ├── prod.tf
-│   ├── variables.tf
+│   └── variables.tf
 ├── ansible/
 │   ├── site.yml
 │   ├── group_vars/
-│   ├── roles/
-│   │   ├── hardening/
-│   │   ├── nginx/
-│   │   └── jenkins/
-├── portfolio/         # Next.js application
+│   └── roles/
+│       ├── hardening/
+│       ├── nginx/
+│       └── jenkins/
+├── portfolio/               # Next.js application
 │   ├── pages/
 │   ├── components/
 │   ├── tailwind.config.js
 │   └── Jenkinsfile
 ```
-</code>
 
 </pre>
+
 
 ## Getting Started
 
