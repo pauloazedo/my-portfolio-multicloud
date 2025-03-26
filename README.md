@@ -62,8 +62,7 @@ Brief description of the project's goal — showcasing your DevOps capabilities 
 ## Repository Structure
 
 <pre>
-
-```
+<code>
 .
 ├── terraform/
 │   ├── main.tf
@@ -82,8 +81,7 @@ Brief description of the project's goal — showcasing your DevOps capabilities 
 │   ├── components/
 │   ├── tailwind.config.js
 │   └── Jenkinsfile
-```
-
+</code>
 </pre>
 
 
