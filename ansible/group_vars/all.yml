@@ -1,12 +1,27 @@
 # Global variables for all hosts
 jenkins_http_port: 8080
-jenkins_admin_user: "{{ lookup('env', 'JENKINS_ADMIN_USER') }}"
-jenkins_admin_pass: "{{ lookup('env', 'JENKINS_ADMIN_PASS') }}"
+
+# Jenkins Admin OCI Vault secret OCIDs
+jenkins_admin_user_ocid: "ocid1.vaultsecret.oc1.iad.amaaaaaap2qn7oiaiy3tezrqqvfent57xzn43etbndln7lics3f4big6sgbq"
+jenkins_admin_pass_ocid: "ocid1.vaultsecret.oc1.iad.amaaaaaap2qn7oiazxgwmkzecy7y44pjigt757mkavvq3t23g2rdeemdtclq"
+
+# OCIR token (also fetched via OCI CLI)
+ocir_token_ocid: "ocid1.vaultsecret.oc1.iad.amaaaaaap2qn7oiaacw73h2eqf4uiezukup7byq42vvzzmkpkv3bdi4rg7aa"
+ocir_token: ""  # Fetched via Ansible from Vault CLI or manually set
+
+# GitHub and Vault Ansible variables (from your env)
 github_token: "{{ lookup('env', 'GITHUB_TOKEN') }}"
 ansible_vault_pass: "{{ lookup('env', 'ANSIBLE_VAULT_PASS') }}"
+
+# OCI Vault metadata (not required for CLI-based fetch but retained for clarity)
 vault_compartment_ocid: "ocid1.compartment.oc1..aaaaaaaad3fawdyyfugb2awpgpooaeszb37zryxbuqnmntef7aiu4qwvqgiq"
 vault_ocid: "ocid1.compartment.oc1..aaaaaaaad3fawdyyfugb2awpgpooaeszb37zryxbuqnmntef7aiu4qwvqgiq"
 key_ocid: "ocid1.keyversion.oc1.iad.ejt6hdnpaablm.a4egm7ry7biaa.abuwcljre63zvvblbqyc3scltl5kihlthukwznk3x4qczpv3uasvr43km4dq"
+
+# UAT site deployment config
+uat_site_container: "uat-site"
+uat_site_image: "iad.ocir.io/pauloazedo/uat-site:latest"
+uat_site_port: 3000
 
 # PROD site containers (Blue/Green Deployment)
 prod_site_green_container: "prod-site-green"
@@ -17,12 +32,6 @@ prod_site_blue_container: "prod-site-blue"
 prod_site_blue_image: "iad.ocir.io/pauloazedo/prod-site:blue"
 prod_site_blue_port: 3200
 
-# UAT site deployment config
-uat_site_container: "uat-site"
-uat_site_image: "iad.ocir.io/pauloazedo/uat-site:latest"
-uat_site_port: 3000
-
-# OCIR auth (for docker login)
+# OCIR auth
 ocir_namespace: "pauloazedo"
-ocir_user: "pauloazedo/devops.user"
-ocir_token: "{{ lookup('community.hashi_vault.hashi_vault', 'secret=ocir_jenkins_auth_token') }}"
+ocir_user: "pauloazedo/devops.user@pauloazedo.us"

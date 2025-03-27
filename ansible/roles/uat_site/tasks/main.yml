@@ -1,21 +1,21 @@
 ---
 - name: Ensure Docker is installed on UAT
-  include_role:
+  ansible.builtin.include_role:
     name: docker
 
 - name: Pull UAT site image from OCI
-  docker_image:
+  community.docker.docker_image:
     name: "{{ uat_site_image }}"
     source: pull
 
 - name: Stop and remove existing UAT site container (if any)
-  docker_container:
+  community.docker.docker_container:
     name: "{{ uat_site_container }}"
     state: absent
     force_kill: true
 
 - name: Run UAT site container
-  docker_container:
+  community.docker.docker_container:
     name: "{{ uat_site_container }}"
     image: "{{ uat_site_image }}"
     restart_policy: always

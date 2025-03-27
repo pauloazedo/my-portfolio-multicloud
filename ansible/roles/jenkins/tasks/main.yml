@@ -1,49 +1,53 @@
 ---
-- name: Install required system packages
-  apt:
-    name:
-      - apt-transport-https
-      - ca-certificates
-      - curl
-      - gnupg
-      - lsb-release
-    state: present
-    update_cache: yes
-
-- name: Install Docker using official install script
-  shell: curl -fsSL https://get.docker.com | sh
-  args:
-    executable: /bin/bash
-
-- name: Ensure Docker service is running
-  systemd:
-    name: docker
-    enabled: true
-    state: started
-
-- name: Add current user to docker group
-  user:
-    name: "{{ ansible_user }}"
-    groups: docker
-    append: yes
-  become: true
-
+# Pull Jenkins LTS Docker image from Docker Hub
 - name: Pull Jenkins LTS Docker image
-  docker_image:
+  community.docker.docker_image:
     name: jenkins/jenkins
     tag: lts
     source: pull
 
+# Create persistent Jenkins home directory with proper permissions
 - name: Ensure Jenkins home directory exists with correct permissions
-  file:
+  ansible.builtin.file:
     path: /var/jenkins_home
     state: directory
     owner: 1000
     group: 1000
     mode: '0755'
 
+# Fetch Jenkins admin user from OCI Vault using CLI
+- name: Get Jenkins admin user from OCI Vault
+  ansible.builtin.command: >
+    oci secrets secret-bundle get
+    --secret-id "{{ jenkins_admin_user_ocid }}"
+    --query "data.secret_bundle_content.content"
+    --raw-output
+  register: jenkins_user_raw
+  changed_when: false
+
+# Decode Base64-encoded Jenkins admin user
+- name: Decode Jenkins admin user
+  ansible.builtin.set_fact:
+    jenkins_admin_user: "{{ jenkins_user_raw.stdout | b64decode }}"
+
+# Fetch Jenkins admin password from OCI Vault using CLI
+- name: Get Jenkins admin password from OCI Vault
+  ansible.builtin.command: >
+    oci secrets secret-bundle get
+    --secret-id "{{ jenkins_admin_pass_ocid }}"
+    --query "data.secret_bundle_content.content"
+    --raw-output
+  register: jenkins_pass_raw
+  changed_when: false
+
+# Decode Base64-encoded Jenkins admin password
+- name: Decode Jenkins admin password
+  ansible.builtin.set_fact:
+    jenkins_admin_pass: "{{ jenkins_pass_raw.stdout | b64decode }}"
+
+# Run Jenkins container with admin credentials from OCI Vault
 - name: Run Jenkins container
-  docker_container:
+  community.docker.docker_container:
     name: jenkins
     image: jenkins/jenkins:lts
     state: started
@@ -53,3 +57,45 @@
       - "50000:50000"
     volumes:
       - /var/jenkins_home:/var/jenkins_home
+    env:
+      JENKINS_ADMIN_ID: "{{ jenkins_admin_user }}"
+      JENKINS_ADMIN_PASSWORD: "{{ jenkins_admin_pass }}"
+
+# Create Groovy init script for admin user
+- name: Create init.groovy.d directory
+  ansible.builtin.file:
+    path: /var/jenkins_home/init.groovy.d
+    state: directory
+    owner: 1000
+    group: 1000
+    mode: '0755'
+
+- name: Create Groovy script to create Jenkins admin user
+  ansible.builtin.copy:
+    dest: /var/jenkins_home/init.groovy.d/basic-security.groovy
+    owner: 1000
+    group: 1000
+    mode: '0644'
+    content: |
+      import jenkins.model.*
+      import hudson.security.*
+
+      def instance = Jenkins.getInstance()
+      def hudsonRealm = new HudsonPrivateSecurityRealm(false)
+      hudsonRealm.createAccount("{{ jenkins_admin_user }}", "{{ jenkins_admin_pass }}")
+      instance.setSecurityRealm(hudsonRealm)
+      def strategy = new FullControlOnceLoggedInAuthorizationStrategy()
+      strategy.setAllowAnonymousRead(false)
+      instance.setAuthorizationStrategy(strategy)
+      instance.save()
+
+# Disable Jenkins setup wizard
+- name: Disable Jenkins setup wizard
+  ansible.builtin.lineinfile:
+    path: /etc/environment
+    line: 'JAVA_OPTS="$JAVA_OPTS -Djenkins.install.runSetupWizard=false"'
+    create: true
+    mode: '0644'
+    owner: root
+    group: root
+  become: true

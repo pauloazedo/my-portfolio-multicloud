@@ -1,15 +1,15 @@
 ---
 - name: Ensure Docker is installed on PROD
-  include_role:
+  ansible.builtin.include_role:
     name: docker
 
 - name: Pull Green site image
-  docker_image:
+  community.docker.docker_image:
     name: "{{ prod_site_green_image }}"
     source: pull
 
 - name: Run Green site container
-  docker_container:
+  community.docker.docker_container:
     name: "{{ prod_site_green_container }}"
     image: "{{ prod_site_green_image }}"
     restart_policy: always
@@ -18,12 +18,12 @@
     state: started
 
 - name: Pull Blue site image
-  docker_image:
+  community.docker.docker_image:
     name: "{{ prod_site_blue_image }}"
     source: pull
 
 - name: Run Blue site container
-  docker_container:
+  community.docker.docker_container:
     name: "{{ prod_site_blue_container }}"
     image: "{{ prod_site_blue_image }}"
     restart_policy: always

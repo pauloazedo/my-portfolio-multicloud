@@ -1,18 +1,18 @@
 ---
 # Install NGINX and required packages
 - name: Install NGINX
-  apt:
+  ansible.builtin.apt:
     name: nginx
     state: present
 
 - name: Ensure NGINX is started and enabled
-  service:
+  ansible.builtin.service:
     name: nginx
     state: started
-    enabled: yes
+    enabled: true
 
 - name: Install Certbot and NGINX plugin
-  apt:
+  ansible.builtin.apt:
     name: "{{ item }}"
     state: present
   loop:
@@ -21,40 +21,49 @@
 
 # Temporary HTTP configs to allow Let's Encrypt validation
 - name: Copy HTTP NGINX config for Jenkins (UAT only)
-  template:
+  ansible.builtin.template:
     src: jenkins-http.conf.j2
     dest: /etc/nginx/sites-available/jenkins
+    owner: root
+    group: root
+    mode: '0644'
   when: inventory_hostname in groups['uat']
 
 - name: Copy HTTP NGINX config for UAT
-  template:
+  ansible.builtin.template:
     src: uat-http.conf.j2
     dest: /etc/nginx/sites-available/uat
+    owner: root
+    group: root
+    mode: '0644'
   when: inventory_hostname in groups['uat']
 
 - name: Copy HTTP NGINX config for PROD
-  template:
+  ansible.builtin.template:
     src: prod-http.conf.j2
     dest: /etc/nginx/sites-available/prod
+    owner: root
+    group: root
+    mode: '0644'
   when: inventory_hostname in groups['prod']
 
 # Enable HTTP site configs
 - name: Enable Jenkins config (UAT only)
-  file:
+  ansible.builtin.file:
     src: /etc/nginx/sites-available/jenkins
     dest: /etc/nginx/sites-enabled/jenkins
     state: link
   when: inventory_hostname in groups['uat']
 
 - name: Enable UAT config
-  file:
+  ansible.builtin.file:
     src: /etc/nginx/sites-available/uat
     dest: /etc/nginx/sites-enabled/uat
     state: link
   when: inventory_hostname in groups['uat']
 
 - name: Enable PROD config
-  file:
+  ansible.builtin.file:
     src: /etc/nginx/sites-available/prod
     dest: /etc/nginx/sites-enabled/prod
     state: link
@@ -62,60 +71,72 @@
 
 # Cleanup and reload NGINX
 - name: Remove default NGINX site if present
-  file:
+  ansible.builtin.file:
     path: /etc/nginx/sites-enabled/default
     state: absent
 
 - name: Reload NGINX (after HTTP config)
-  service:
+  ansible.builtin.service:
     name: nginx
     state: reloaded
 
 # TLS Certificates via Certbot
 - name: Generate HTTPS certificate for uat.pauloazedo.us
-  command: >
+  ansible.builtin.command: >
     certbot --nginx --non-interactive --agree-tos
     --email pauloazedo@pauloazedo.us
     -d uat.pauloazedo.us
   when: inventory_hostname in groups['uat']
+  changed_when: false
   tags: certbot
 
 - name: Generate HTTPS certificate for prod.pauloazedo.us
-  command: >
+  ansible.builtin.command: >
     certbot --nginx --non-interactive --agree-tos
     --email pauloazedo@pauloazedo.us
     -d prod.pauloazedo.us
   when: inventory_hostname in groups['prod']
+  changed_when: false
   tags: certbot
 
 - name: Generate HTTPS certificate for jenkins.pauloazedo.us
-  command: >
+  ansible.builtin.command: >
     certbot --nginx --non-interactive --agree-tos
     --email pauloazedo@pauloazedo.us
     -d jenkins.pauloazedo.us
   when: inventory_hostname in groups['uat']
+  changed_when: false
   tags: certbot
 
 # Replace HTTP with secure HTTPS configs
 - name: Replace Jenkins config with HTTPS (UAT only)
-  template:
+  ansible.builtin.template:
     src: jenkins-https.conf.j2
     dest: /etc/nginx/sites-available/jenkins
+    owner: root
+    group: root
+    mode: '0644'
   when: inventory_hostname in groups['uat']
 
 - name: Replace UAT config with HTTPS
-  template:
+  ansible.builtin.template:
     src: uat-https.conf.j2
     dest: /etc/nginx/sites-available/uat
+    owner: root
+    group: root
+    mode: '0644'
   when: inventory_hostname in groups['uat']
 
 - name: Replace PROD config with HTTPS
-  template:
+  ansible.builtin.template:
     src: prod-https.conf.j2
     dest: /etc/nginx/sites-available/prod
+    owner: root
+    group: root
+    mode: '0644'
   when: inventory_hostname in groups['prod']
 
 - name: Reload NGINX (after HTTPS config)
-  service:
+  ansible.builtin.service:
     name: nginx
     state: reloaded

@@ -1,31 +1,131 @@
 ---
+# Update the system
 - name: Update apt cache and upgrade packages
-  apt:
-    update_cache: yes
+  ansible.builtin.apt:
+    update_cache: true
     upgrade: dist
   tags: update
 
 - name: Remove unnecessary packages
-  apt:
-    autoremove: yes
+  ansible.builtin.apt:
+    autoremove: true
   tags: update
 
-- name: Install required packages for OCI Docker login
-  apt:
+# Install system packages needed for OCI login and Docker SDK
+- name: Install prerequisites for Docker
+  ansible.builtin.apt:
     name:
-      - docker.io
+      - apt-transport-https
+      - ca-certificates
+      - curl
+      - gnupg
+      - lsb-release
       - python3-pip
     state: present
-    update_cache: yes
+    update_cache: true
 
-- name: Install docker-py for Ansible docker modules
-  pip:
-    name: docker
-    executable: pip3
+# Ensure /etc/apt/keyrings exists
+- name: Create APT keyrings directory
+  ansible.builtin.file:
+    path: /etc/apt/keyrings
+    state: directory
+    mode: '0755'
 
-- name: Log in to Oracle Cloud Container Registry (OCIR)
-  docker_login:
+# Remove conflicting legacy Docker repo files
+- name: Remove conflicting Docker APT repo files
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - /etc/apt/sources.list.d/docker.list
+    - /etc/apt/sources.list.d/docker-ce.list
+    - /etc/apt/sources.list.d/download_docker_com_linux_ubuntu.list
+
+# Download Docker GPG key
+- name: Download Docker GPG key to /etc/apt/keyrings
+  ansible.builtin.get_url:
+    url: https://download.docker.com/linux/ubuntu/gpg
+    dest: /etc/apt/keyrings/docker.asc
+    mode: '0644'
+
+# Add Docker APT repository
+- name: Add Docker APT repository
+  ansible.builtin.apt_repository:
+    repo: "deb [arch=amd64 signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu {{ ansible_distribution_release | lower }} stable"
+    state: present
+    filename: docker
+
+# Install Docker engine and CLI
+- name: Install Docker packages
+  ansible.builtin.apt:
+    name:
+      - docker-ce
+      - docker-ce-cli
+      - containerd.io
+    state: present
+    update_cache: true
+
+# Install python3-docker via apt to avoid PEP 668 issues
+- name: Install python3-docker using apt (instead of pip)
+  ansible.builtin.apt:
+    name: python3-docker
+    state: present
+
+# Check if OCI CLI is already installed
+- name: Check if OCI CLI is installed
+  ansible.builtin.command: which oci
+  register: oci_cli_check
+  ignore_errors: true
+  changed_when: false
+
+# Download OCI CLI install script
+- name: Download OCI CLI install script
+  ansible.builtin.get_url:
+    url: https://raw.githubusercontent.com/oracle/oci-cli/master/scripts/install/install.sh
+    dest: /tmp/install_oci_cli.sh
+    mode: '0755'
+  when: oci_cli_check.rc != 0
+
+# Install OCI CLI silently (creates ~/.oci and oci binary in ~/bin)
+- name: Install OCI CLI silently
+  ansible.builtin.command: bash /tmp/install_oci_cli.sh --accept-all-defaults
+  args:
+    creates: /home/{{ ansible_user }}/bin/oci
+  environment:
+    HOME: /home/{{ ansible_user }}
+  when: oci_cli_check.rc != 0
+
+# Symlink OCI to /usr/local/bin for system-wide availability
+- name: Symlink OCI to /usr/local/bin
+  ansible.builtin.file:
+    src: /home/{{ ansible_user }}/bin/oci
+    dest: /usr/local/bin/oci
+    state: link
+  when: oci_cli_check.rc != 0
+
+- name: Validate OCI CLI is available in PATH
+  ansible.builtin.command: oci --version
+  register: oci_cli_version
+  changed_when: false
+
+# Fetch OCIR token from OCI Vault
+- name: Get OCIR token from OCI Vault
+  ansible.builtin.command: >
+    oci secrets secret-bundle get
+    --secret-id "{{ ocir_token_ocid }}"
+    --query "data.secret_bundle_content.content"
+    --raw-output
+  register: ocir_token_raw
+  changed_when: false
+
+- name: Decode OCIR token
+  ansible.builtin.set_fact:
+    ocir_token: "{{ ocir_token_raw.stdout | b64decode }}"
+
+# Log in to OCIR with Docker
+- name: Log in to OCIR
+  community.docker.docker_login:
     registry_url: iad.ocir.io
     username: "{{ ocir_namespace }}/{{ ocir_user }}"
     password: "{{ ocir_token }}"
-    reauthorize: yes
+    reauthorize: true

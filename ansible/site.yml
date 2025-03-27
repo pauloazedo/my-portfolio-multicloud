@@ -4,6 +4,7 @@
   become: true
   roles:
     - bootstrap     # apt update, upgrade, autoremove
+    - common        # OCI CLI, Docker Python SDK, OCIR login
     - hardening     # fail2ban, iptables
     - docker        # install Docker and dependencies
     - nginx         # nginx, certbot, TLS

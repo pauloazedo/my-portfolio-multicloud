@@ -1,20 +1,26 @@
+---
+# === Fail2Ban Setup ===
+
 - name: Install Fail2Ban
-  apt:
+  ansible.builtin.apt:
     name: fail2ban
     state: present
-    update_cache: yes
+    update_cache: true
   become: true
 
 - name: Ensure Fail2Ban is enabled and running
-  systemd:
+  ansible.builtin.systemd:
     name: fail2ban
     enabled: true
     state: started
   become: true
 
 - name: Deploy custom Fail2Ban jail config
-  copy:
+  ansible.builtin.copy:
     dest: /etc/fail2ban/jail.local
+    mode: '0644'
+    owner: root
+    group: root
     content: |
       [DEFAULT]
       bantime = 3600
@@ -48,36 +54,39 @@
 # === IPTABLES RULES ===
 
 - name: Ensure iptables-persistent is installed
-  apt:
+  ansible.builtin.apt:
     name: iptables-persistent
     state: present
     update_cache: true
   become: true
 
 - name: Check if HTTP (port 80) rule exists
-  command: iptables -C INPUT -p tcp --dport 80 -j ACCEPT
+  ansible.builtin.command: iptables -C INPUT -p tcp --dport 80 -j ACCEPT
   register: check_http_rule
   failed_when: false
   changed_when: false
   become: true
 
 - name: Insert HTTP rule if not present
-  command: iptables -I INPUT -p tcp --dport 80 -j ACCEPT
+  ansible.builtin.command: iptables -I INPUT -p tcp --dport 80 -j ACCEPT
   when: check_http_rule.rc != 0
+  changed_when: true
   become: true
 
 - name: Check if HTTPS (port 443) rule exists
-  command: iptables -C INPUT -p tcp --dport 443 -j ACCEPT
+  ansible.builtin.command: iptables -C INPUT -p tcp --dport 443 -j ACCEPT
   register: check_https_rule
   failed_when: false
   changed_when: false
   become: true
 
 - name: Insert HTTPS rule if not present
-  command: iptables -I INPUT -p tcp --dport 443 -j ACCEPT
+  ansible.builtin.command: iptables -I INPUT -p tcp --dport 443 -j ACCEPT
   when: check_https_rule.rc != 0
+  changed_when: true
   become: true
 
 - name: Persist iptables rules
-  shell: iptables-save > /etc/iptables/rules.v4
+  ansible.builtin.shell: iptables-save > /etc/iptables/rules.v4
+  changed_when: true
   become: true
