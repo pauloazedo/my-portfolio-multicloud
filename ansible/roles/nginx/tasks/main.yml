@@ -1,9 +1,10 @@
 ---
 # Install NGINX and required packages
 - name: Install NGINX
-  ansible.builtin.apt:
+  ansible.builtin.dnf:
     name: nginx
     state: present
+    update_cache: true
 
 - name: Ensure NGINX is started and enabled
   ansible.builtin.service:
@@ -11,13 +12,13 @@
     state: started
     enabled: true
 
+# Install Certbot and NGINX plugin
 - name: Install Certbot and NGINX plugin
-  ansible.builtin.apt:
-    name: "{{ item }}"
+  ansible.builtin.dnf:
+    name:
+      - certbot
+      - python3-certbot-nginx
     state: present
-  loop:
-    - certbot
-    - python3-certbot-nginx
 
 # Temporary HTTP configs to allow Let's Encrypt validation
 - name: Copy HTTP NGINX config for Jenkins (UAT only)

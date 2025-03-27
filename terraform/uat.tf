@@ -11,7 +11,7 @@ resource "oci_core_subnet" "uat_subnet" {
 
 # === UAT INSTANCE ===
 resource "oci_core_instance" "uat" {
-  availability_domain = data.oci_identity_availability_domains.ads.availability_domains[0].name
+  availability_domain = "PFeQ:US-ASHBURN-AD-2"
   compartment_id      = oci_identity_compartment.devops_portfolio.id
   display_name        = "uat-instance"
   shape               = "VM.Standard.A1.Flex"
@@ -44,7 +44,8 @@ resource "oci_core_instance" "uat" {
 
   source_details {
     source_type = "image"
-    source_id   = "ocid1.image.oc1.iad.aaaaaaaahga37ytba47p2msqzbh5erbqvniyybcvteuh646vgyw4tltustka"
+    source_id   = "ocid1.image.oc1.iad.aaaaaaaawvs4xn6dfl6oo45o2ntziecjy2cbet2mlidvx3ji62oi3jai4u5a"
+    boot_volume_size_in_gbs = 55
   }
 }
 
@@ -52,7 +53,7 @@ resource "oci_core_instance" "uat" {
 data "oci_core_vnic_attachments" "uat" {
   compartment_id      = oci_identity_compartment.devops_portfolio.id
   instance_id         = oci_core_instance.uat.id
-  availability_domain = data.oci_identity_availability_domains.ads.availability_domains[0].name
+  availability_domain = "PFeQ:US-ASHBURN-AD-2"
 }
 
 # === VNIC DETAILS ===

@@ -1,4 +1,23 @@
 ---
+# Ensure Python 3.7+ is installed and set as default
+- name: Ensure Python 3.7+ is installed
+  hosts: all
+  become: true
+  tasks:
+    - name: Install Python 3.7+ if it's not already installed
+      ansible.builtin.dnf:
+        name: python3
+        state: present
+      when: ansible_python.version.major < 3 or ansible_python.version.minor < 7
+
+    - name: Set Python 3 as default for Ansible
+      ansible.builtin.lineinfile:
+        path: /etc/ansible/ansible.cfg
+        regexp: '^interpreter_python'
+        line: 'interpreter_python = /usr/bin/python3'
+      when: ansible_python.version.major < 3 or ansible_python.version.minor < 7
+
+# Setup UAT and PROD infrastructure
 - name: Setup UAT and PROD infrastructure
   hosts: all
   become: true
@@ -9,18 +28,21 @@
     - docker        # install Docker and dependencies
     - nginx         # nginx, certbot, TLS
 
+# Setup Jenkins (UAT only)
 - name: Setup Jenkins (UAT only)
   hosts: uat
   become: true
   roles:
     - jenkins       # Jenkins container on Docker
 
+# Deploy UAT site container
 - name: Deploy UAT site container
   hosts: uat
   become: true
   roles:
     - uat_site      # Your portfolio site in a Docker container
 
+# Deploy PROD site container
 - name: Deploy PROD site container
   hosts: prod
   become: true

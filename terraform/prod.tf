@@ -11,7 +11,7 @@ resource "oci_core_subnet" "prod_subnet" {
 
 # === PROD INSTANCE ===
 resource "oci_core_instance" "prod" {
-  availability_domain = data.oci_identity_availability_domains.ads.availability_domains[0].name
+  availability_domain = "PFeQ:US-ASHBURN-AD-2"
   compartment_id      = oci_identity_compartment.devops_portfolio.id
   display_name        = "prod-instance"
   shape               = "VM.Standard.A1.Flex"
@@ -44,7 +44,23 @@ resource "oci_core_instance" "prod" {
 
   source_details {
     source_type = "image"
-    source_id   = "ocid1.image.oc1.iad.aaaaaaaahga37ytba47p2msqzbh5erbqvniyybcvteuh646vgyw4tltustka"
+    source_id   = "ocid1.image.oc1.iad.aaaaaaaawvs4xn6dfl6oo45o2ntziecjy2cbet2mlidvx3ji62oi3jai4u5a"
+    boot_volume_size_in_gbs = 55
+  }
+
+  # === Add remote-exec provisioner to install Python 3.7 ===
+  provisioner "remote-exec" {
+    inline = [
+      "sudo dnf update -y",               # Update all packages
+      "sudo dnf install -y python3.11",     # Install Python 3.11
+      "python3 --version"                # Verify Python version
+    ]
+    connection {
+      type        = "ssh"
+      user        = "opc"  # Use the user configured for your instance
+      private_key = file("~/.ssh/id_rsa")
+      host        = self.public_ip
+    }
   }
 }
 
@@ -52,7 +68,7 @@ resource "oci_core_instance" "prod" {
 data "oci_core_vnic_attachments" "prod" {
   compartment_id      = oci_identity_compartment.devops_portfolio.id
   instance_id         = oci_core_instance.prod.id
-  availability_domain = data.oci_identity_availability_domains.ads.availability_domains[0].name
+  availability_domain = "PFeQ:US-ASHBURN-AD-2"
 }
 
 # === VNIC DETAILS ===

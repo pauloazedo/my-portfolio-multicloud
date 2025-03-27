@@ -32,7 +32,7 @@ data "oci_identity_availability_domains" "ads" {
 
 # === COMPARTMENT ===
 resource "oci_identity_compartment" "devops_portfolio" {
-  name          = "DevOpsPortfolioCompartmentV3"
+  name          = "DevOpsPortfolioCompartmentV5"
   description   = "Compartment for OCI DevOps portfolio project"
   enable_delete = true
 

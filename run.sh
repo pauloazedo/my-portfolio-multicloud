@@ -25,4 +25,5 @@ done
 echo -e "\n[+] SSH is ready on PROD."
 
 echo "[+] Running Ansible playbook (site.yml)..."
-ansible-playbook -i ansible/inventory/hosts.ini ansible/site.yml
+ansible-playbook -i ansible/inventory/hosts ansible/site.yml
+
