@@ -1,0 +1,31 @@
+---
+- name: Update apt cache and upgrade packages
+  apt:
+    update_cache: yes
+    upgrade: dist
+  tags: update
+
+- name: Remove unnecessary packages
+  apt:
+    autoremove: yes
+  tags: update
+
+- name: Install required packages for OCI Docker login
+  apt:
+    name:
+      - docker.io
+      - python3-pip
+    state: present
+    update_cache: yes
+
+- name: Install docker-py for Ansible docker modules
+  pip:
+    name: docker
+    executable: pip3
+
+- name: Log in to Oracle Cloud Container Registry (OCIR)
+  docker_login:
+    registry_url: iad.ocir.io
+    username: "{{ ocir_namespace }}/{{ ocir_user }}"
+    password: "{{ ocir_token }}"
+    reauthorize: yes

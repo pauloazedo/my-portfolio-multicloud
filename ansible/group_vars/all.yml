@@ -7,3 +7,22 @@ ansible_vault_pass: "{{ lookup('env', 'ANSIBLE_VAULT_PASS') }}"
 vault_compartment_ocid: "ocid1.compartment.oc1..aaaaaaaad3fawdyyfugb2awpgpooaeszb37zryxbuqnmntef7aiu4qwvqgiq"
 vault_ocid: "ocid1.compartment.oc1..aaaaaaaad3fawdyyfugb2awpgpooaeszb37zryxbuqnmntef7aiu4qwvqgiq"
 key_ocid: "ocid1.keyversion.oc1.iad.ejt6hdnpaablm.a4egm7ry7biaa.abuwcljre63zvvblbqyc3scltl5kihlthukwznk3x4qczpv3uasvr43km4dq"
+
+# PROD site containers (Blue/Green Deployment)
+prod_site_green_container: "prod-site-green"
+prod_site_green_image: "iad.ocir.io/pauloazedo/prod-site:green"
+prod_site_green_port: 3100
+
+prod_site_blue_container: "prod-site-blue"
+prod_site_blue_image: "iad.ocir.io/pauloazedo/prod-site:blue"
+prod_site_blue_port: 3200
+
+# UAT site deployment config
+uat_site_container: "uat-site"
+uat_site_image: "iad.ocir.io/pauloazedo/uat-site:latest"
+uat_site_port: 3000
+
+# OCIR auth (for docker login)
+ocir_namespace: "pauloazedo"
+ocir_user: "pauloazedo/devops.user"
+ocir_token: "{{ lookup('community.hashi_vault.hashi_vault', 'secret=ocir_jenkins_auth_token') }}"

@@ -1,0 +1,6 @@
+# OCI image for the UAT version of the portfolio site
+uat_site_image: "iad.ocir.io/pauloazedo/uat-site:latest"
+
+# Port and container name for the UAT container
+uat_site_port: 3000
+uat_site_container: "uat_site"

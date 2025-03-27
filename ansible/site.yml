@@ -1,3 +1,27 @@
 ---
-- import_playbook: nginx.yml
-- import_playbook: jenkins.yml
+- name: Setup UAT and PROD infrastructure
+  hosts: all
+  become: true
+  roles:
+    - bootstrap     # apt update, upgrade, autoremove
+    - hardening     # fail2ban, iptables
+    - docker        # install Docker and dependencies
+    - nginx         # nginx, certbot, TLS
+
+- name: Setup Jenkins (UAT only)
+  hosts: uat
+  become: true
+  roles:
+    - jenkins       # Jenkins container on Docker
+
+- name: Deploy UAT site container
+  hosts: uat
+  become: true
+  roles:
+    - uat_site      # Your portfolio site in a Docker container
+
+- name: Deploy PROD site container
+  hosts: prod
+  become: true
+  roles:
+    - prod_site     # Your portfolio site in a Docker container

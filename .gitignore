@@ -72,3 +72,4 @@ roles/*/
 !roles/**/templates/
 !roles/**/files/
 !roles/**/vars/
+.vscode/

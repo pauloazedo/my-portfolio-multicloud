@@ -1,0 +1,9 @@
+server {
+    listen 80;
+    server_name prod.pauloazedo.us;
+
+    location / {
+        return 200 'PROD temporary HTTP config for certificate validation.';
+        add_header Content-Type text/plain;
+    }
+}

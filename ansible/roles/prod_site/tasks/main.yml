@@ -1,0 +1,32 @@
+---
+- name: Ensure Docker is installed on PROD
+  include_role:
+    name: docker
+
+- name: Pull Green site image
+  docker_image:
+    name: "{{ prod_site_green_image }}"
+    source: pull
+
+- name: Run Green site container
+  docker_container:
+    name: "{{ prod_site_green_container }}"
+    image: "{{ prod_site_green_image }}"
+    restart_policy: always
+    published_ports:
+      - "{{ prod_site_green_port }}:3000"
+    state: started
+
+- name: Pull Blue site image
+  docker_image:
+    name: "{{ prod_site_blue_image }}"
+    source: pull
+
+- name: Run Blue site container
+  docker_container:
+    name: "{{ prod_site_blue_container }}"
+    image: "{{ prod_site_blue_image }}"
+    restart_policy: always
+    published_ports:
+      - "{{ prod_site_blue_port }}:3000"
+    state: started

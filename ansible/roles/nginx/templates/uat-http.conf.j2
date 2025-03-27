@@ -1,0 +1,9 @@
+server {
+    listen 80;
+    server_name uat.pauloazedo.us;
+
+    location / {
+        return 200 'UAT temporary HTTP config for certificate validation.';
+        add_header Content-Type text/plain;
+    }
+}

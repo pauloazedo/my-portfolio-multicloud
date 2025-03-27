@@ -1,9 +1,9 @@
 ---
+# Install NGINX and required packages
 - name: Install NGINX
   apt:
     name: nginx
     state: present
-    update_cache: yes
 
 - name: Ensure NGINX is started and enabled
   service:
@@ -15,29 +15,30 @@
   apt:
     name: "{{ item }}"
     state: present
-    update_cache: yes
   loop:
     - certbot
     - python3-certbot-nginx
 
-- name: Copy NGINX site config for Jenkins (UAT only)
+# Temporary HTTP configs to allow Let's Encrypt validation
+- name: Copy HTTP NGINX config for Jenkins (UAT only)
   template:
-    src: jenkins.conf.j2
+    src: jenkins-http.conf.j2
     dest: /etc/nginx/sites-available/jenkins
   when: inventory_hostname in groups['uat']
 
-- name: Copy NGINX site config for UAT
+- name: Copy HTTP NGINX config for UAT
   template:
-    src: uat.conf.j2
+    src: uat-http.conf.j2
     dest: /etc/nginx/sites-available/uat
   when: inventory_hostname in groups['uat']
 
-- name: Copy NGINX site config for PROD
+- name: Copy HTTP NGINX config for PROD
   template:
-    src: prod.conf.j2
+    src: prod-http.conf.j2
     dest: /etc/nginx/sites-available/prod
   when: inventory_hostname in groups['prod']
 
+# Enable HTTP site configs
 - name: Enable Jenkins config (UAT only)
   file:
     src: /etc/nginx/sites-available/jenkins
@@ -59,20 +60,62 @@
     state: link
   when: inventory_hostname in groups['prod']
 
+# Cleanup and reload NGINX
 - name: Remove default NGINX site if present
   file:
     path: /etc/nginx/sites-enabled/default
     state: absent
 
-- name: Reload NGINX
+- name: Reload NGINX (after HTTP config)
   service:
     name: nginx
     state: reloaded
 
+# TLS Certificates via Certbot
 - name: Generate HTTPS certificate for uat.pauloazedo.us
-  command: certbot --nginx --non-interactive --agree-tos --email pauloazedo@pauloazedo.us -d uat.pauloazedo.us
+  command: >
+    certbot --nginx --non-interactive --agree-tos
+    --email pauloazedo@pauloazedo.us
+    -d uat.pauloazedo.us
   when: inventory_hostname in groups['uat']
+  tags: certbot
 
 - name: Generate HTTPS certificate for prod.pauloazedo.us
-  command: certbot --nginx --non-interactive --agree-tos --email pauloazedo@pauloazedo.us -d prod.pauloazedo.us
+  command: >
+    certbot --nginx --non-interactive --agree-tos
+    --email pauloazedo@pauloazedo.us
+    -d prod.pauloazedo.us
   when: inventory_hostname in groups['prod']
+  tags: certbot
+
+- name: Generate HTTPS certificate for jenkins.pauloazedo.us
+  command: >
+    certbot --nginx --non-interactive --agree-tos
+    --email pauloazedo@pauloazedo.us
+    -d jenkins.pauloazedo.us
+  when: inventory_hostname in groups['uat']
+  tags: certbot
+
+# Replace HTTP with secure HTTPS configs
+- name: Replace Jenkins config with HTTPS (UAT only)
+  template:
+    src: jenkins-https.conf.j2
+    dest: /etc/nginx/sites-available/jenkins
+  when: inventory_hostname in groups['uat']
+
+- name: Replace UAT config with HTTPS
+  template:
+    src: uat-https.conf.j2
+    dest: /etc/nginx/sites-available/uat
+  when: inventory_hostname in groups['uat']
+
+- name: Replace PROD config with HTTPS
+  template:
+    src: prod-https.conf.j2
+    dest: /etc/nginx/sites-available/prod
+  when: inventory_hostname in groups['prod']
+
+- name: Reload NGINX (after HTTPS config)
+  service:
+    name: nginx
+    state: reloaded

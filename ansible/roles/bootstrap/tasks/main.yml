@@ -1,0 +1,11 @@
+---
+- name: Update apt cache and upgrade packages
+  apt:
+    update_cache: yes
+    upgrade: dist
+  tags: update
+
+- name: Remove unnecessary packages
+  apt:
+    autoremove: yes
+  tags: update
