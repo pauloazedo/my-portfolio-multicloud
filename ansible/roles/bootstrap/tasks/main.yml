@@ -1,5 +1,19 @@
-- name: Update system packages
+---
+# System bootstrap tasks for Oracle Linux 9 (OL9 only)
+
+- name: Update all system packages to latest version
   ansible.builtin.dnf:
     name: "*"
-    state: present
+    state: latest
+    update_cache: true
   tags: update
+
+- name: Autoremove unused packages
+  ansible.builtin.dnf:
+    autoremove: true
+  tags: autoremove
+
+- name: Clean all cached DNF metadata
+  ansible.builtin.command: dnf clean all
+  changed_when: false
+  tags: clean

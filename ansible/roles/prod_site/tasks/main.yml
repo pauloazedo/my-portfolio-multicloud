@@ -1,32 +1,24 @@
 ---
-- name: Ensure Docker is installed on PROD
+- name: Ensure Docker is installed on UAT
   ansible.builtin.include_role:
     name: docker
+  tags: always  # this ensures Docker is always ensured regardless of tag
 
-- name: Pull Green site image
-  community.docker.docker_image:
-    name: "{{ prod_site_green_image }}"
-    source: pull
+- name: Create placeholder index.html for UAT
+  ansible.builtin.copy:
+    content: "<html><body><h1>UAT Environment - Awaiting first deployment</h1></body></html>"
+    dest: /home/devops/uat_index.html
+    owner: devops
+    group: devops
+    mode: '0644'
 
-- name: Run Green site container
+- name: Run UAT placeholder container
   community.docker.docker_container:
-    name: "{{ prod_site_green_container }}"
-    image: "{{ prod_site_green_image }}"
+    name: uat-site
+    image: nginx:alpine
     restart_policy: always
     published_ports:
-      - "{{ prod_site_green_port }}:3000"
-    state: started
-
-- name: Pull Blue site image
-  community.docker.docker_image:
-    name: "{{ prod_site_blue_image }}"
-    source: pull
-
-- name: Run Blue site container
-  community.docker.docker_container:
-    name: "{{ prod_site_blue_container }}"
-    image: "{{ prod_site_blue_image }}"
-    restart_policy: always
-    published_ports:
-      - "{{ prod_site_blue_port }}:3000"
+      - "{{ uat_site_port }}:80"
+    volumes:
+      - /home/devops/uat_index.html:/usr/share/nginx/html/index.html:ro
     state: started

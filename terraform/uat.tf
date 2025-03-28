@@ -21,12 +21,6 @@ resource "oci_core_instance" "uat" {
     memory_in_gbs = 12
   }
 
-  create_vnic_details {
-    subnet_id        = oci_core_subnet.uat_subnet.id
-    assign_public_ip = true
-    hostname_label   = "uat"
-  }
-
   metadata = {
     ssh_authorized_keys = file(var.ssh_public_key_path)
     user_data = base64encode(<<-EOT
@@ -43,22 +37,28 @@ resource "oci_core_instance" "uat" {
   }
 
   source_details {
-    source_type = "image"
-    source_id   = "ocid1.image.oc1.iad.aaaaaaaawvs4xn6dfl6oo45o2ntziecjy2cbet2mlidvx3ji62oi3jai4u5a"
-    boot_volume_size_in_gbs = 55
+    source_type               = "image"
+    source_id                 = "ocid1.image.oc1.iad.aaaaaaaawvs4xn6dfl6oo45o2ntziecjy2cbet2mlidvx3ji62oi3jai4u5a"
+    boot_volume_size_in_gbs   = 55
   }
 }
 
-# === VNIC ATTACHMENT LOOKUP ===
-data "oci_core_vnic_attachments" "uat" {
-  compartment_id      = oci_identity_compartment.devops_portfolio.id
-  instance_id         = oci_core_instance.uat.id
-  availability_domain = "PFeQ:US-ASHBURN-AD-2"
+# === VNIC CREATION WITH NSG ATTACHED ===
+resource "oci_core_vnic_attachment" "uat_vnic_attachment" {
+  instance_id = oci_core_instance.uat.id
+
+  create_vnic_details {
+    subnet_id              = oci_core_subnet.uat_subnet.id
+    display_name           = "uat-vnic"
+    assign_public_ip       = true
+    nsg_ids                = [oci_core_network_security_group.nsg.id]
+    skip_source_dest_check = false
+  }
 }
 
-# === VNIC DETAILS ===
+# === VNIC DATA SOURCE ===
 data "oci_core_vnic" "uat" {
-  vnic_id = data.oci_core_vnic_attachments.uat.vnic_attachments[0].vnic_id
+  vnic_id = oci_core_vnic_attachment.uat_vnic_attachment.vnic_id
 }
 
 # === CLOUDFLARE DNS RECORD FOR UAT ===
@@ -79,22 +79,4 @@ resource "cloudflare_dns_record" "jenkins" {
   content = data.oci_core_vnic.uat.public_ip_address
   ttl     = 300
   proxied = false
-}
-
-# === Attach NSG to VNIC ===
-resource "null_resource" "attach_nsg_to_uat_vnic" {
-  triggers = {
-    vnic_id = data.oci_core_vnic.uat.id
-    nsg_id  = oci_core_network_security_group.nsg.id
-  }
-
-  provisioner "local-exec" {
-    command = <<EOT
-      oci network vnic update \
-        --vnic-id "${self.triggers.vnic_id}" \
-        --nsg-ids '["${self.triggers.nsg_id}"]' \
-        --force \
-        --profile DEVOPS
-EOT
-  }
 }

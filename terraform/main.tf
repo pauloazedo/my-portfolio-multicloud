@@ -25,7 +25,7 @@ provider "cloudflare" {
   api_token = var.cloudflare_api_token
 }
 
-# === AVAILABILITY DOMAINS, fetch ADs dinamically ===
+# === AVAILABILITY DOMAINS ===
 data "oci_identity_availability_domains" "ads" {
   compartment_id = var.tenancy_ocid
 }
@@ -83,12 +83,14 @@ resource "oci_core_network_security_group_security_rule" "allow_ssh" {
   protocol                  = "6"
   source_type               = "CIDR_BLOCK"
   source                    = "0.0.0.0/0"
+
   tcp_options {
     destination_port_range {
       min = 22
       max = 22
     }
   }
+
   description = "Allow SSH"
 }
 
@@ -98,12 +100,14 @@ resource "oci_core_network_security_group_security_rule" "allow_http" {
   protocol                  = "6"
   source_type               = "CIDR_BLOCK"
   source                    = "0.0.0.0/0"
+
   tcp_options {
     destination_port_range {
       min = 80
       max = 80
     }
   }
+
   description = "Allow HTTP"
 }
 
@@ -113,12 +117,13 @@ resource "oci_core_network_security_group_security_rule" "allow_https" {
   protocol                  = "6"
   source_type               = "CIDR_BLOCK"
   source                    = "0.0.0.0/0"
+
   tcp_options {
     destination_port_range {
       min = 443
       max = 443
     }
   }
+
   description = "Allow HTTPS"
 }
-

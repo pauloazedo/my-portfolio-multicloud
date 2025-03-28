@@ -1,50 +1,50 @@
 ---
-# Ensure Python 3.7+ is installed and set as default
+# Main Ansible playbook to provision infrastructure for both UAT and PROD environments
+
+# Step 1: Ensure Python 3.7+ is available (needed on clean OCI instances)
 - name: Ensure Python 3.7+ is installed
   hosts: all
   become: true
   tasks:
-    - name: Install Python 3.7+ if it's not already installed
-      ansible.builtin.dnf:
-        name: python3
-        state: present
-      when: ansible_python.version.major < 3 or ansible_python.version.minor < 7
+    - name: Install Python 3.7+ if not already installed
+      ansible.builtin.raw: |
+        if ! command -v python3 &> /dev/null || [[ "$(python3 -V 2>&1 | awk '{print $2}')" < "3.7" ]]; then
+          sudo dnf install -y python3
+        fi
+      changed_when: false
 
     - name: Set Python 3 as default for Ansible
-      ansible.builtin.lineinfile:
-        path: /etc/ansible/ansible.cfg
-        regexp: '^interpreter_python'
-        line: 'interpreter_python = /usr/bin/python3'
-      when: ansible_python.version.major < 3 or ansible_python.version.minor < 7
+      ansible.builtin.set_fact:
+        ansible_python_interpreter: /usr/bin/python3
 
-# Setup UAT and PROD infrastructure
-- name: Setup UAT and PROD infrastructure
+# Step 2: Setup base system (shared across UAT & PROD)
+- name: Setup base infrastructure (UAT & PROD)
   hosts: all
   become: true
   roles:
-    - bootstrap     # apt update, upgrade, autoremove
-    - common        # OCI CLI, Docker Python SDK, OCIR login
-    - hardening     # fail2ban, iptables
-    - docker        # install Docker and dependencies
-    - nginx         # nginx, certbot, TLS
+    - role: bootstrap
+    - role: common
+    - role: hardening
+    - role: docker
+    - role: nginx
 
-# Setup Jenkins (UAT only)
+# Step 3: Configure Jenkins (UAT only)
 - name: Setup Jenkins (UAT only)
   hosts: uat
   become: true
   roles:
-    - jenkins       # Jenkins container on Docker
+    - role: jenkins
 
-# Deploy UAT site container
-- name: Deploy UAT site container
+# Step 4: Deploy UAT site container
+- name: Deploy UAT web container
   hosts: uat
   become: true
   roles:
-    - uat_site      # Your portfolio site in a Docker container
+    - role: uat_site
 
-# Deploy PROD site container
-- name: Deploy PROD site container
+# Step 5: Deploy PROD site container (Blue/Green)
+- name: Deploy PROD web container
   hosts: prod
   become: true
   roles:
-    - prod_site     # Your portfolio site in a Docker container
+    - role: prod_site

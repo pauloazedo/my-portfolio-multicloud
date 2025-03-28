@@ -1,93 +1,76 @@
 ---
-# Ensure Python 3.7+ is installed
-- name: Ensure Python 3.7+ is installed and set as default
-  ansible.builtin.dnf:
+# Common setup tasks for all servers
+
+- name: Ensure Python 3.7+ is installed
+  ansible.builtin.package:
     name: python3
     state: present
-  when: ansible_python.version.major < 3 or ansible_python.version.minor < 7
+  when: ansible_facts.python.version.major < 3 or
+        (ansible_facts.python.version.major == 3 and ansible_facts.python.version.minor < 7)
 
-- name: Set Python 3 as the default interpreter for Ansible
-  ansible.builtin.lineinfile:
-    path: /etc/ansible/ansible.cfg
-    regexp: '^interpreter_python'
-    line: 'interpreter_python = /usr/bin/python3'
-  when: ansible_python.version.major < 3 or ansible_python.version.minor < 7
+- name: Set Python 3 as the default interpreter
+  ansible.builtin.alternatives:
+    name: python
+    path: /usr/bin/python3
 
-# Update the system
-- name: Update dnf cache and upgrade packages
-  ansible.builtin.dnf:
-    name: "*"
-    state: present
-  tags: update
-
-# Install system packages needed for OCI login and Docker SDK
-- name: Install prerequisites for Docker
-  ansible.builtin.dnf:
+- name: Install base packages
+  ansible.builtin.package:
     name:
-      - ca-certificates
+      - git
       - curl
+      - unzip
+      - wget
+      - ca-certificates
       - gnupg
-      - python3-pip
     state: present
-    update_cache: true
 
-# Ensure /etc/dnf/keyrings exists
-- name: Create DNF keyrings directory
-  ansible.builtin.file:
-    path: /etc/dnf/keyrings
-    state: directory
-    mode: '0755'
-
-# Remove conflicting legacy Docker repo files
-- name: Remove conflicting Docker YUM repo files
-  ansible.builtin.file:
-    path: "{{ item }}"
+- name: Remove podman-docker shim (conflicts with Docker CE)
+  ansible.builtin.package:
+    name: podman-docker
     state: absent
-  loop:
-    - /etc/yum.repos.d/docker.repo
-    - /etc/yum.repos.d/docker-ce.repo
 
-# Download Docker GPG key
-- name: Download Docker GPG key to /etc/dnf/keyrings
-  ansible.builtin.get_url:
-    url: https://download.docker.com/linux/centos/gpg
-    dest: /etc/dnf/keyrings/docker.asc
-    mode: '0644'
-
-# Add Docker YUM repository for Oracle Linux (ARM version)
-- name: Add Docker YUM repository for ARM architecture
+- name: Add Docker CE YUM repository for OL9 ARM
   ansible.builtin.yum_repository:
-    name: docker
-    description: Docker CE Stable - EL8 ARM
-    baseurl: "https://download.docker.com/linux/centos/8/aarch64/stable"
-    enabled: true
+    name: docker-ce
+    description: Docker CE Stable - $basearch
+    baseurl: https://download.docker.com/linux/centos/9/$basearch/stable
     gpgcheck: true
-    gpgkey: file:///etc/dnf/keyrings/docker.asc
+    gpgkey: https://download.docker.com/linux/centos/gpg
+    enabled: true
 
-# Install Docker engine and CLI (ARM version)
-- name: Install Docker packages for ARM architecture
-  ansible.builtin.dnf:
+- name: Install Docker CE and CLI (ARM64)
+  ansible.builtin.package:
     name:
       - docker-ce
       - docker-ce-cli
       - containerd.io
     state: present
-    update_cache: true
 
-# Install python3-docker via dnf to avoid PEP 668 issues
-- name: Install python3-docker using dnf (instead of pip)
-  ansible.builtin.dnf:
-    name: python3-docker
-    state: present
+- name: Enable and start Docker service
+  ansible.builtin.service:
+    name: docker
+    enabled: true
+    state: started
 
-# Check if OCI CLI is already installed via dnf
-- name: Install OCI CLI via dnf
-  ansible.builtin.dnf:
-    name: oci-cli
-    state: present
+- name: Install docker Python SDK via pip
+  ansible.builtin.pip:
+    name: docker
+    executable: pip3
 
-# Validate OCI CLI is available in PATH
-- name: Validate OCI CLI is available in PATH
-  ansible.builtin.command: oci --version
+- name: Install OCI CLI using Oracle script
+  ansible.builtin.get_url:
+    url: https://raw.githubusercontent.com/oracle/oci-cli/master/scripts/install/install.sh
+    dest: /tmp/oci-cli-install.sh
+    mode: '0755'
+
+- name: Run OCI CLI installer
+  ansible.builtin.command: bash /tmp/oci-cli-install.sh --accept-all-defaults
+  args:
+    creates: /home/devops/bin/oci
+  become: true
+  become_user: devops
+
+- name: Verify OCI CLI installation
+  ansible.builtin.command: /home/devops/bin/oci --version
   register: oci_cli_version
   changed_when: false

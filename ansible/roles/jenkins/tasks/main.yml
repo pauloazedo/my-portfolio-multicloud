@@ -1,51 +1,27 @@
 ---
-# Pull Jenkins LTS Docker image from Docker Hub
+# Main Jenkins role tasks
+
+# Step 1: Generate and install SSH key for Jenkins remote Ansible access
+- name: Include SSH key setup for Jenkins remote Ansible access
+  ansible.builtin.include_tasks: ssh.yml
+
+# Step 2: Pull the latest Jenkins LTS image (multi-arch, includes ARM64)
 - name: Pull Jenkins LTS Docker image
   community.docker.docker_image:
     name: jenkins/jenkins
     tag: lts
     source: pull
 
-# Create persistent Jenkins home directory with proper permissions
-- name: Ensure Jenkins home directory exists with correct permissions
+# Step 3: Ensure persistent data directory exists
+- name: Ensure Jenkins data directory exists
   ansible.builtin.file:
-    path: /var/jenkins_home
+    path: /home/devops/jenkins_data
     state: directory
-    owner: 1000
-    group: 1000
+    owner: devops
+    group: devops
     mode: '0755'
 
-# Fetch Jenkins admin user from OCI Vault using CLI
-- name: Get Jenkins admin user from OCI Vault
-  ansible.builtin.command: >
-    oci secrets secret-bundle get
-    --secret-id "{{ jenkins_admin_user_ocid }}"
-    --query "data.secret_bundle_content.content"
-    --raw-output
-  register: jenkins_user_raw
-  changed_when: false
-
-# Decode Base64-encoded Jenkins admin user
-- name: Decode Jenkins admin user
-  ansible.builtin.set_fact:
-    jenkins_admin_user: "{{ jenkins_user_raw.stdout | b64decode }}"
-
-# Fetch Jenkins admin password from OCI Vault using CLI
-- name: Get Jenkins admin password from OCI Vault
-  ansible.builtin.command: >
-    oci secrets secret-bundle get
-    --secret-id "{{ jenkins_admin_pass_ocid }}"
-    --query "data.secret_bundle_content.content"
-    --raw-output
-  register: jenkins_pass_raw
-  changed_when: false
-
-# Decode Base64-encoded Jenkins admin password
-- name: Decode Jenkins admin password
-  ansible.builtin.set_fact:
-    jenkins_admin_pass: "{{ jenkins_pass_raw.stdout | b64decode }}"
-
-# Run Jenkins container with admin credentials from OCI Vault
+# Step 4: Run Jenkins container with plugins.txt mounted
 - name: Run Jenkins container
   community.docker.docker_container:
     name: jenkins
@@ -56,46 +32,56 @@
       - "8080:8080"
       - "50000:50000"
     volumes:
-      - /var/jenkins_home:/var/jenkins_home
-    env:
-      JENKINS_ADMIN_ID: "{{ jenkins_admin_user }}"
-      JENKINS_ADMIN_PASSWORD: "{{ jenkins_admin_pass }}"
+      - /home/devops/jenkins_data:/var/jenkins_home
+      - "{{ role_path }}/files/plugins.txt:/plugins.txt:ro"
+    user: root
 
-# Create Groovy init script for admin user
-- name: Create init.groovy.d directory
+# Step 5: Install Jenkins plugins from plugins.txt (only if not already installed)
+- name: Install Jenkins plugins via jenkins-plugin-cli
+  community.docker.docker_container_exec:
+    container: jenkins
+    command: >
+      bash -c "cat /plugins.txt | xargs jenkins-plugin-cli --plugins"
+  register: plugin_install_result
+  failed_when: plugin_install_result.rc != 0
+  notify: Restart Jenkins
+
+# Step 6: Create plugins-installed flag
+- name: Create plugins-installed marker file
   ansible.builtin.file:
-    path: /var/jenkins_home/init.groovy.d
-    state: directory
-    owner: 1000
-    group: 1000
-    mode: '0755'
-
-- name: Create Groovy script to create Jenkins admin user
-  ansible.builtin.copy:
-    dest: /var/jenkins_home/init.groovy.d/basic-security.groovy
-    owner: 1000
-    group: 1000
+    path: /home/devops/jenkins_data/.plugins-installed
+    state: touch
+    owner: devops
+    group: devops
     mode: '0644'
-    content: |
-      import jenkins.model.*
-      import hudson.security.*
 
-      def instance = Jenkins.getInstance()
-      def hudsonRealm = new HudsonPrivateSecurityRealm(false)
-      hudsonRealm.createAccount("{{ jenkins_admin_user }}", "{{ jenkins_admin_pass }}")
-      instance.setSecurityRealm(hudsonRealm)
-      def strategy = new FullControlOnceLoggedInAuthorizationStrategy()
-      strategy.setAllowAnonymousRead(false)
-      instance.setAuthorizationStrategy(strategy)
-      instance.save()
-
-# Disable Jenkins setup wizard
-- name: Disable Jenkins setup wizard
-  ansible.builtin.lineinfile:
-    path: /etc/environment
-    line: 'JAVA_OPTS="$JAVA_OPTS -Djenkins.install.runSetupWizard=false"'
-    create: true
-    mode: '0644'
-    owner: root
-    group: root
+# Step 7: Install Python, pip, Ansible, and OCI SDK inside Jenkins container (using virtualenv)
+- name: Install python3-venv and dependencies inside Jenkins container to create virtual environment
+  community.docker.docker_container_exec:
+    container: jenkins
+    command: >
+      bash -c "apt-get update &&
+               apt-get install -y python3-venv python3-pip &&
+               python3 -m venv /home/jenkins/venv &&
+               /home/jenkins/venv/bin/pip install --upgrade pip &&
+               /home/jenkins/venv/bin/pip install ansible oci"
   become: true
+
+# Step 8: Install pipx if not installed
+- name: Install pipx inside Jenkins container (if not already installed)
+  community.docker.docker_container_exec:
+    container: jenkins
+    command: >
+      bash -c "apt-get update &&
+               apt-get install -y pipx"
+  become: true
+  when: ansible_facts.packages['pipx'] is not defined
+
+# Step 9: Install jenkins-plugin-cli via pipx
+- name: Install jenkins-plugin-cli via pipx
+  community.docker.docker_container_exec:
+    container: jenkins
+    command: >
+      bash -c "pipx install jenkins-plugin-cli"
+  become: true
+  when: ansible_facts.packages['pipx'] is defined
