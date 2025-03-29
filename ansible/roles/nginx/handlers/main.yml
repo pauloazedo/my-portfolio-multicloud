@@ -1,3 +1,12 @@
-#SPDX-License-Identifier: MIT-0
 ---
-# handlers file for ansible/roles/nginx
+# Handlers for NGINX role
+
+- name: Reload NGINX
+  ansible.builtin.service:
+    name: nginx
+    state: reloaded
+
+- name: Restart NGINX
+  ansible.builtin.service:
+    name: nginx
+    state: restarted

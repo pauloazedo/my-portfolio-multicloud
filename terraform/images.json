@@ -1,0 +1,82 @@
+{
+  "data": [
+    {
+      "agent-features": null,
+      "base-image-id": null,
+      "billable-size-in-gbs": 6,
+      "compartment-id": null,
+      "create-image-allowed": true,
+      "defined-tags": {},
+      "display-name": "Oracle-Linux-8.10-aarch64-2025.03.18-0",
+      "freeform-tags": {},
+      "id": "ocid1.image.oc1.iad.aaaaaaaa3zzp4jue2jp5wm2hesslxoq27qqrzxfwdxylcabkv3ginqacgqra",
+      "launch-mode": "NATIVE",
+      "launch-options": {
+        "boot-volume-type": "PARAVIRTUALIZED",
+        "firmware": "UEFI_64",
+        "is-consistent-volume-naming-enabled": true,
+        "is-pv-encryption-in-transit-enabled": true,
+        "network-type": "PARAVIRTUALIZED",
+        "remote-data-volume-type": "PARAVIRTUALIZED"
+      },
+      "lifecycle-state": "AVAILABLE",
+      "listing-type": null,
+      "operating-system": "Oracle Linux",
+      "operating-system-version": "8",
+      "size-in-mbs": 47719,
+      "time-created": "2025-03-25T07:46:41.216000+00:00"
+    },
+    {
+      "agent-features": null,
+      "base-image-id": null,
+      "billable-size-in-gbs": 6,
+      "compartment-id": null,
+      "create-image-allowed": true,
+      "defined-tags": {},
+      "display-name": "Oracle-Linux-8.10-aarch64-2025.02.28-0",
+      "freeform-tags": {},
+      "id": "ocid1.image.oc1.iad.aaaaaaaa3kj3oky4bt4ef4qfb7ynitylwrgw2jhsja6qa4nlnqiqytgjdxpq",
+      "launch-mode": "NATIVE",
+      "launch-options": {
+        "boot-volume-type": "PARAVIRTUALIZED",
+        "firmware": "UEFI_64",
+        "is-consistent-volume-naming-enabled": true,
+        "is-pv-encryption-in-transit-enabled": true,
+        "network-type": "PARAVIRTUALIZED",
+        "remote-data-volume-type": "PARAVIRTUALIZED"
+      },
+      "lifecycle-state": "AVAILABLE",
+      "listing-type": null,
+      "operating-system": "Oracle Linux",
+      "operating-system-version": "8",
+      "size-in-mbs": 47719,
+      "time-created": "2025-03-11T06:14:15.211000+00:00"
+    },
+    {
+      "agent-features": null,
+      "base-image-id": null,
+      "billable-size-in-gbs": 6,
+      "compartment-id": null,
+      "create-image-allowed": true,
+      "defined-tags": {},
+      "display-name": "Oracle-Linux-8.10-aarch64-2025.01.31-0",
+      "freeform-tags": {},
+      "id": "ocid1.image.oc1.iad.aaaaaaaaoiebzy5vwwwnb46up4saxvgh3xvwo3bug3tbjg2mxrzzatz2vyqq",
+      "launch-mode": "NATIVE",
+      "launch-options": {
+        "boot-volume-type": "PARAVIRTUALIZED",
+        "firmware": "UEFI_64",
+        "is-consistent-volume-naming-enabled": true,
+        "is-pv-encryption-in-transit-enabled": true,
+        "network-type": "PARAVIRTUALIZED",
+        "remote-data-volume-type": "PARAVIRTUALIZED"
+      },
+      "lifecycle-state": "AVAILABLE",
+      "listing-type": null,
+      "operating-system": "Oracle Linux",
+      "operating-system-version": "8",
+      "size-in-mbs": 47719,
+      "time-created": "2025-02-13T10:23:10.163000+00:00"
+    }
+  ]
+}

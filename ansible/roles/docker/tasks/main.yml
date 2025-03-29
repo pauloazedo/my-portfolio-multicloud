@@ -1,37 +1,53 @@
 ---
-- name: Install prerequisites
-  apt:
+# Install and configure Docker on Oracle Linux 9 ARM
+
+# Step 1: Install required packages
+- name: Install Docker prerequisites
+  ansible.builtin.package:
     name:
-      - apt-transport-https
-      - ca-certificates
-      - curl
-      - software-properties-common
-      - gnupg-agent
-    state: present
-    update_cache: yes
-
-- name: Add Docker GPG key
-  apt_key:
-    url: https://download.docker.com/linux/ubuntu/gpg
+      - yum-utils
+      - device-mapper-persistent-data
+      - lvm2
     state: present
 
-- name: Add Docker APT repository
-  apt_repository:
-    repo: deb [arch=amd64] https://download.docker.com/linux/ubuntu focal stable
-    state: present
-    filename: docker
+# Step 2: Add Docker CE repository
+- name: Add Docker CE YUM repository
+  ansible.builtin.yum_repository:
+    name: docker-ce-stable
+    description: Docker CE Stable - $basearch
+    baseurl: https://download.docker.com/linux/centos/9/aarch64/stable
+    gpgcheck: yes
+    gpgkey: https://download.docker.com/linux/centos/gpg
+    enabled: yes
 
-- name: Install Docker packages
-  apt:
+# Step 3: Install Docker CE, CLI, and containerd
+- name: Install Docker CE, CLI and containerd
+  ansible.builtin.package:
     name:
       - docker-ce
       - docker-ce-cli
       - containerd.io
     state: present
-    update_cache: yes
 
-- name: Ensure Docker service is running
-  service:
+# Step 4: Load iptables NAT modules (for networking)
+- name: Load iptables NAT modules
+  ansible.builtin.shell: |
+    modprobe ip_tables
+    modprobe iptable_nat
+    modprobe ip_conntrack
+  args:
+    warn: false
+
+# Step 5: Enable and start Docker
+- name: Enable and start Docker service (with restart)
+  ansible.builtin.service:
     name: docker
-    state: started
     enabled: true
+    state: restarted
+
+# Step 6: Add current user to docker group (Ansible remote user)
+- name: Add user to docker group
+  ansible.builtin.user:
+    name: "{{ ansible_user }}"
+    groups: docker
+    append: yes

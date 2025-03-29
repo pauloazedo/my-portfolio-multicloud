@@ -1,121 +1,41 @@
 ---
-# Install NGINX and required packages
-- name: Install NGINX
-  apt:
+# NGINX role main task list
+
+# Step 1: Install and start NGINX
+- name: Ensure NGINX is installed
+  ansible.builtin.package:
     name: nginx
     state: present
 
-- name: Ensure NGINX is started and enabled
-  service:
+- name: Enable and start NGINX service
+  ansible.builtin.service:
     name: nginx
     state: started
-    enabled: yes
+    enabled: true
 
-- name: Install Certbot and NGINX plugin
-  apt:
-    name: "{{ item }}"
-    state: present
-  loop:
-    - certbot
-    - python3-certbot-nginx
-
-# Temporary HTTP configs to allow Let's Encrypt validation
-- name: Copy HTTP NGINX config for Jenkins (UAT only)
-  template:
+# Step 2: Deploy initial HTTP configs
+- name: Deploy Jenkins HTTP config (UAT only)
+  ansible.builtin.template:
     src: jenkins-http.conf.j2
-    dest: /etc/nginx/sites-available/jenkins
+    dest: /etc/nginx/conf.d/jenkins.conf
+    mode: '0644'
   when: inventory_hostname in groups['uat']
 
-- name: Copy HTTP NGINX config for UAT
-  template:
+- name: Deploy UAT HTTP config
+  ansible.builtin.template:
     src: uat-http.conf.j2
-    dest: /etc/nginx/sites-available/uat
+    dest: /etc/nginx/conf.d/uat.conf
+    mode: '0644'
   when: inventory_hostname in groups['uat']
 
-- name: Copy HTTP NGINX config for PROD
-  template:
+- name: Deploy PROD HTTP config
+  ansible.builtin.template:
     src: prod-http.conf.j2
-    dest: /etc/nginx/sites-available/prod
+    dest: /etc/nginx/conf.d/prod.conf
+    mode: '0644'
   when: inventory_hostname in groups['prod']
 
-# Enable HTTP site configs
-- name: Enable Jenkins config (UAT only)
-  file:
-    src: /etc/nginx/sites-available/jenkins
-    dest: /etc/nginx/sites-enabled/jenkins
-    state: link
-  when: inventory_hostname in groups['uat']
-
-- name: Enable UAT config
-  file:
-    src: /etc/nginx/sites-available/uat
-    dest: /etc/nginx/sites-enabled/uat
-    state: link
-  when: inventory_hostname in groups['uat']
-
-- name: Enable PROD config
-  file:
-    src: /etc/nginx/sites-available/prod
-    dest: /etc/nginx/sites-enabled/prod
-    state: link
-  when: inventory_hostname in groups['prod']
-
-# Cleanup and reload NGINX
-- name: Remove default NGINX site if present
-  file:
-    path: /etc/nginx/sites-enabled/default
-    state: absent
-
-- name: Reload NGINX (after HTTP config)
-  service:
-    name: nginx
-    state: reloaded
-
-# TLS Certificates via Certbot
-- name: Generate HTTPS certificate for uat.pauloazedo.us
-  command: >
-    certbot --nginx --non-interactive --agree-tos
-    --email pauloazedo@pauloazedo.us
-    -d uat.pauloazedo.us
-  when: inventory_hostname in groups['uat']
+# Step 3: Include certbot tasks (modularized in a separate file)
+- name: Include Certbot tasks
+  ansible.builtin.include_tasks: certbot.yml
   tags: certbot
-
-- name: Generate HTTPS certificate for prod.pauloazedo.us
-  command: >
-    certbot --nginx --non-interactive --agree-tos
-    --email pauloazedo@pauloazedo.us
-    -d prod.pauloazedo.us
-  when: inventory_hostname in groups['prod']
-  tags: certbot
-
-- name: Generate HTTPS certificate for jenkins.pauloazedo.us
-  command: >
-    certbot --nginx --non-interactive --agree-tos
-    --email pauloazedo@pauloazedo.us
-    -d jenkins.pauloazedo.us
-  when: inventory_hostname in groups['uat']
-  tags: certbot
-
-# Replace HTTP with secure HTTPS configs
-- name: Replace Jenkins config with HTTPS (UAT only)
-  template:
-    src: jenkins-https.conf.j2
-    dest: /etc/nginx/sites-available/jenkins
-  when: inventory_hostname in groups['uat']
-
-- name: Replace UAT config with HTTPS
-  template:
-    src: uat-https.conf.j2
-    dest: /etc/nginx/sites-available/uat
-  when: inventory_hostname in groups['uat']
-
-- name: Replace PROD config with HTTPS
-  template:
-    src: prod-https.conf.j2
-    dest: /etc/nginx/sites-available/prod
-  when: inventory_hostname in groups['prod']
-
-- name: Reload NGINX (after HTTPS config)
-  service:
-    name: nginx
-    state: reloaded

@@ -11,7 +11,7 @@ resource "oci_core_subnet" "prod_subnet" {
 
 # === PROD INSTANCE ===
 resource "oci_core_instance" "prod" {
-  availability_domain = data.oci_identity_availability_domains.ads.availability_domains[0].name
+  availability_domain = "PFeQ:US-ASHBURN-AD-2"
   compartment_id      = oci_identity_compartment.devops_portfolio.id
   display_name        = "prod-instance"
   shape               = "VM.Standard.A1.Flex"
@@ -19,12 +19,6 @@ resource "oci_core_instance" "prod" {
   shape_config {
     ocpus         = 2
     memory_in_gbs = 12
-  }
-
-  create_vnic_details {
-    subnet_id        = oci_core_subnet.prod_subnet.id
-    assign_public_ip = true
-    hostname_label   = "prod"
   }
 
   metadata = {
@@ -43,21 +37,28 @@ resource "oci_core_instance" "prod" {
   }
 
   source_details {
-    source_type = "image"
-    source_id   = "ocid1.image.oc1.iad.aaaaaaaahga37ytba47p2msqzbh5erbqvniyybcvteuh646vgyw4tltustka"
+    source_type             = "image"
+    source_id               = "ocid1.image.oc1.iad.aaaaaaaawvs4xn6dfl6oo45o2ntziecjy2cbet2mlidvx3ji62oi3jai4u5a"
+    boot_volume_size_in_gbs = 55
   }
 }
 
-# === VNIC ATTACHMENT LOOKUP ===
-data "oci_core_vnic_attachments" "prod" {
-  compartment_id      = oci_identity_compartment.devops_portfolio.id
-  instance_id         = oci_core_instance.prod.id
-  availability_domain = data.oci_identity_availability_domains.ads.availability_domains[0].name
+# === VNIC CREATION WITH NSG ATTACHED ===
+resource "oci_core_vnic_attachment" "prod_vnic_attachment" {
+  instance_id = oci_core_instance.prod.id
+
+  create_vnic_details {
+    subnet_id              = oci_core_subnet.prod_subnet.id
+    display_name           = "prod-vnic"
+    assign_public_ip       = true
+    nsg_ids                = [oci_core_network_security_group.nsg.id]
+    skip_source_dest_check = false
+  }
 }
 
-# === VNIC DETAILS ===
+# === VNIC DATA SOURCE ===
 data "oci_core_vnic" "prod" {
-  vnic_id = data.oci_core_vnic_attachments.prod.vnic_attachments[0].vnic_id
+  vnic_id = oci_core_vnic_attachment.prod_vnic_attachment.vnic_id
 }
 
 # === CLOUDFLARE DNS RECORD FOR PROD ===
@@ -68,22 +69,4 @@ resource "cloudflare_dns_record" "prod" {
   content = data.oci_core_vnic.prod.public_ip_address
   ttl     = 300
   proxied = false
-}
-
-# === Attach NSG to VNIC ===
-resource "null_resource" "attach_nsg_to_prod_vnic" {
-  triggers = {
-    vnic_id = data.oci_core_vnic.prod.id
-    nsg_id  = oci_core_network_security_group.nsg.id
-  }
-
-  provisioner "local-exec" {
-    command = <<EOT
-      oci network vnic update \
-        --vnic-id "${self.triggers.vnic_id}" \
-        --nsg-ids '["${self.triggers.nsg_id}"]' \
-        --force \
-        --profile DEVOPS
-EOT
-  }
 }

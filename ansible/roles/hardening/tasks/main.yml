@@ -1,83 +1,74 @@
+---
+# Security hardening tasks for all servers
+
+# Step 1: Enable EPEL for access to Fail2Ban and other tools
+- name: Install Oracle EPEL release (OL9)
+  ansible.builtin.dnf:
+    name: oracle-epel-release-el9
+    state: present
+
+- name: Enable EPEL repository
+  ansible.builtin.command: dnf config-manager --enable ol9_developer_EPEL
+  args:
+    creates: /etc/yum.repos.d/oracle-epel-ol9.repo
+
+# Step 2: Install Fail2Ban
 - name: Install Fail2Ban
-  apt:
+  ansible.builtin.package:
     name: fail2ban
     state: present
-    update_cache: yes
-  become: true
 
-- name: Ensure Fail2Ban is enabled and running
-  systemd:
+- name: Enable and start Fail2Ban service
+  ansible.builtin.service:
     name: fail2ban
     enabled: true
     state: started
-  become: true
 
-- name: Deploy custom Fail2Ban jail config
-  copy:
+# Step 3: Deploy custom jail.local
+- name: Deploy custom jail.local
+  ansible.builtin.copy:
+    src: jail.local
     dest: /etc/fail2ban/jail.local
-    content: |
-      [DEFAULT]
-      bantime = 3600
-      findtime = 600
-      maxretry = 5
-      backend = systemd
-
-      [sshd]
-      enabled = true
-
-      [nginx-http-auth]
-      enabled = true
-
-      [nginx-botsearch]
-      enabled = true
-
-      [nginx-req-limit]
-      enabled = true
-
-      [nginx-noscript]
-      enabled = true
-
-      [nginx-nohome]
-      enabled = true
-
-      [nginx-404]
-      enabled = true
+    owner: root
+    group: root
+    mode: '0644'
   notify: Restart fail2ban
-  become: true
 
-# === IPTABLES RULES ===
-
-- name: Ensure iptables-persistent is installed
-  apt:
-    name: iptables-persistent
+# Step 4: Install and configure iptables
+- name: Install iptables and iptables-services
+  ansible.builtin.package:
+    name:
+      - iptables
+      - iptables-services
     state: present
-    update_cache: true
-  become: true
 
-- name: Check if HTTP (port 80) rule exists
-  command: iptables -C INPUT -p tcp --dport 80 -j ACCEPT
-  register: check_http_rule
+- name: Enable and start iptables service
+  ansible.builtin.service:
+    name: iptables
+    enabled: true
+    state: started
+
+# Step 5: Add iptables rules for HTTP/HTTPS if missing
+- name: Check if HTTP rule exists
+  ansible.builtin.shell: iptables -C INPUT -p tcp --dport 80 -j ACCEPT
+  register: http_rule_check
   failed_when: false
   changed_when: false
-  become: true
 
-- name: Insert HTTP rule if not present
-  command: iptables -I INPUT -p tcp --dport 80 -j ACCEPT
-  when: check_http_rule.rc != 0
-  become: true
+- name: Add HTTP rule if missing
+  ansible.builtin.command: iptables -A INPUT -p tcp --dport 80 -j ACCEPT
+  when: http_rule_check.rc != 0
 
-- name: Check if HTTPS (port 443) rule exists
-  command: iptables -C INPUT -p tcp --dport 443 -j ACCEPT
-  register: check_https_rule
+- name: Check if HTTPS rule exists
+  ansible.builtin.shell: iptables -C INPUT -p tcp --dport 443 -j ACCEPT
+  register: https_rule_check
   failed_when: false
   changed_when: false
-  become: true
 
-- name: Insert HTTPS rule if not present
-  command: iptables -I INPUT -p tcp --dport 443 -j ACCEPT
-  when: check_https_rule.rc != 0
-  become: true
+- name: Add HTTPS rule if missing
+  ansible.builtin.command: iptables -A INPUT -p tcp --dport 443 -j ACCEPT
+  when: https_rule_check.rc != 0
 
-- name: Persist iptables rules
-  shell: iptables-save > /etc/iptables/rules.v4
-  become: true
+# Step 6: Save iptables rules
+- name: Save iptables rules to disk
+  ansible.builtin.command: service iptables save
