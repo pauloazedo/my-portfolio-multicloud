@@ -73,3 +73,9 @@ roles/*/
 !roles/**/files/
 !roles/**/vars/
 .vscode/
+
+# Ansible secrets
+ansible/group_vars/all.secrets.yml
+ansible/group_vars/all.secrets.yml.*
+*.secrets.yml
+*.secrets.yml.*
