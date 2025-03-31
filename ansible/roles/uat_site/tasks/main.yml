@@ -1,24 +1,68 @@
 ---
+# UAT Site Deployment with fallback and image labeling
+
+# Step 1: Ensure Docker is installed
 - name: Ensure Docker is installed on UAT
   ansible.builtin.include_role:
     name: docker
 
-- name: Pull UAT site image from OCI
-  community.docker.docker_image:
-    name: "{{ uat_site_image }}"
-    source: pull
-
+# Step 2: Stop any existing container
 - name: Stop and remove existing UAT site container (if any)
   community.docker.docker_container:
     name: "{{ uat_site_container }}"
     state: absent
     force_kill: true
 
-- name: Run UAT site container
+# Step 3: Check if UAT image exists locally
+- name: Check if UAT site image exists locally
+  ansible.builtin.command: docker image inspect "{{ uat_site_image }}"
+  register: uat_image_check
+  failed_when: false
+  changed_when: false
+
+- name: Debug image presence
+  ansible.builtin.debug:
+    msg: "Using UAT image from OCI Registry"
+  when: uat_image_check.rc == 0
+
+# Step 4: Run UAT container if image exists
+- name: Run UAT site container (real app)
   community.docker.docker_container:
     name: "{{ uat_site_container }}"
     image: "{{ uat_site_image }}"
     restart_policy: always
     published_ports:
       - "{{ uat_site_port }}:3000"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
     state: started
+  when: uat_image_check.rc == 0
+
+# Step 5: Build fallback image if no OCI image exists
+- name: Build fallback 'waiting for Jenkins' image (labeled)
+  community.docker.docker_image:
+    name: "uat-site-waiting"
+    tag: "latest"
+    source: build
+    build:
+      path: "{{ playbook_dir }}/files"
+      dockerfile: uat-waiting.Dockerfile
+      labels:
+        org.opencontainers.image.created: "{{ ansible_date_time.iso8601 }}"
+        org.opencontainers.image.description: "Fallback UAT site - waiting for Jenkins"
+        org.opencontainers.image.source: "ansible"
+  when: uat_image_check.rc != 0
+
+- name: Run fallback UAT container (waiting for Jenkins)
+  community.docker.docker_container:
+    name: "{{ uat_site_container }}"
+    image: "uat-site-waiting"
+    restart_policy: always
+    published_ports:
+      - "{{ uat_site_port }}:3000"
+    state: started
+  when: uat_image_check.rc != 0

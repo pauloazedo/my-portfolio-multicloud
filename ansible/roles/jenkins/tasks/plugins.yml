@@ -1,0 +1,14 @@
+---
+# Install Jenkins plugins directly
+
+- name: Install Jenkins plugins via jenkins-plugin-cli
+  community.docker.docker_container_exec:
+    container: jenkins
+    command: >
+      cat /plugins.txt | xargs jenkins-plugin-cli --plugins
+
+- name: Restart Jenkins to apply plugin changes
+  community.docker.docker_container:
+    name: jenkins
+    state: restarted
+  when: result.rc == 0

@@ -3,8 +3,7 @@
   hosts: all
   become: true
   vars_files:
-    - vars/main.yml
-    - group_vars/all.yml
+    - group_vars/all.secrets.yml
   roles:
     - role: hardening
       tags: hardening

@@ -1,0 +1,29 @@
+---
+# Prepare Jenkins persistent data volume and initialization script
+
+# Step 1: Ensure Jenkins data directory exists
+- name: Ensure Jenkins data directory exists
+  ansible.builtin.file:
+    path: /home/devops/jenkins_data
+    state: directory
+    owner: devops
+    group: devops
+    mode: '0755'
+
+# Step 2: Ensure Jenkins init.groovy.d directory exists
+- name: Ensure Jenkins init.groovy.d directory exists
+  ansible.builtin.file:
+    path: /home/devops/jenkins_data/init.groovy.d
+    state: directory
+    owner: devops
+    group: devops
+    mode: '0755'
+
+# Step 3: Copy Jenkins admin user Groovy bootstrap script
+- name: Copy Jenkins admin user Groovy bootstrap script
+  ansible.builtin.copy:
+    src: 01-admin-user.groovy
+    dest: /home/devops/jenkins_data/init.groovy.d/01-admin-user.groovy
+    owner: devops
+    group: devops
+    mode: '0644'

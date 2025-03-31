@@ -1,8 +1,8 @@
 [DEFAULT]
-bantime = {{ fail2ban_default_settings.bantime }}
-findtime = {{ fail2ban_default_settings.findtime }}
-maxretry = {{ fail2ban_default_settings.maxretry }}
-ignoreip = {{ fail2ban_default_settings.ignoreip }}
+bantime = {{ hardening_fail2ban_merged_settings.bantime }}
+findtime = {{ hardening_fail2ban_merged_settings.findtime }}
+maxretry = {{ hardening_fail2ban_merged_settings.maxretry }}
+ignoreip = {{ hardening_fail2ban_merged_settings.ignoreip }}
 
 [sshd]
 enabled = true

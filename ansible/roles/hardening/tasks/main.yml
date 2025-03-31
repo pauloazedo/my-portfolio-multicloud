@@ -1,18 +1,36 @@
 ---
 # Security hardening tasks for all servers
 
-# Step 1: Enable EPEL for access to Fail2Ban and other tools
-- name: Install Oracle EPEL release (OL9)
+# === Step 1: Enable Required Repositories ===
+
+- name: Install Oracle EPEL release for OL9
   ansible.builtin.dnf:
     name: oracle-epel-release-el9
     state: present
 
-- name: Enable EPEL repository
-  ansible.builtin.command: dnf config-manager --enable ol9_developer_EPEL
-  args:
-    creates: /etc/yum.repos.d/oracle-epel-ol9.repo
+- name: Ensure EPEL repo is enabled (ol9_developer_EPEL)
+  ansible.builtin.ini_file:
+    path: /etc/yum.repos.d/oracle-epel-ol9.repo
+    section: ol9_developer_EPEL
+    option: enabled
+    value: '1'
+    mode: '0644'
+  notify: Refresh DNF cache
 
-# Step 2: Install Fail2Ban
+- name: Enable CRB repo (required for Fail2Ban)
+  ansible.builtin.command: dnf config-manager --set-enabled crb
+  register: crb_result
+  changed_when: "'enabled' in crb_result.stdout or 'enabled' in crb_result.stderr"
+  failed_when: false
+  notify: Refresh DNF cache
+
+- name: Clean DNF metadata
+  ansible.builtin.command: dnf clean all
+  changed_when: false
+
+
+# === Step 2: Install and Configure Fail2Ban ===
+
 - name: Install Fail2Ban
   ansible.builtin.package:
     name: fail2ban
@@ -24,17 +42,26 @@
     enabled: true
     state: started
 
-# Step 3: Deploy custom jail.local
+- name: Merge default and override Fail2Ban settings
+  ansible.builtin.set_fact:
+    hardening_fail2ban_merged_settings: >-
+      {{
+        hardening_fail2ban_default_settings
+        | combine(hardening_fail2ban_custom_settings | default({}), recursive=True)
+      }}
+
 - name: Deploy custom jail.local
-  ansible.builtin.copy:
-    src: jail.local
+  ansible.builtin.template:
+    src: jail.local.j2
     dest: /etc/fail2ban/jail.local
     owner: root
     group: root
     mode: '0644'
   notify: Restart fail2ban
 
-# Step 4: Install and configure iptables
+
+# === Step 3: Install and Enable iptables ===
+
 - name: Install iptables and iptables-services
   ansible.builtin.package:
     name:
@@ -48,27 +75,58 @@
     enabled: true
     state: started
 
-# Step 5: Add iptables rules for HTTP/HTTPS if missing
-- name: Check if HTTP rule exists
-  ansible.builtin.shell: iptables -C INPUT -p tcp --dport 80 -j ACCEPT
-  register: http_rule_check
-  failed_when: false
+
+# === Step 4: Ensure iptables Rules Exist ===
+
+- name: Check if REJECT rule exists
+  ansible.builtin.command: iptables -C INPUT -j REJECT --reject-with icmp-host-prohibited
+  register: reject_rule_check
   changed_when: false
+  failed_when: false
+
+- name: Remove REJECT rule if present
+  ansible.builtin.command: iptables -D INPUT -j REJECT --reject-with icmp-host-prohibited
+  when: reject_rule_check.rc == 0
+  changed_when: true
+
+- name: Check if HTTP rule exists
+  ansible.builtin.command: iptables -C INPUT -p tcp --dport 80 -j ACCEPT
+  register: http_rule_check
+  changed_when: false
+  failed_when: false
 
 - name: Add HTTP rule if missing
   ansible.builtin.command: iptables -A INPUT -p tcp --dport 80 -j ACCEPT
   when: http_rule_check.rc != 0
+  changed_when: true
 
 - name: Check if HTTPS rule exists
-  ansible.builtin.shell: iptables -C INPUT -p tcp --dport 443 -j ACCEPT
+  ansible.builtin.command: iptables -C INPUT -p tcp --dport 443 -j ACCEPT
   register: https_rule_check
-  failed_when: false
   changed_when: false
+  failed_when: false
 
 - name: Add HTTPS rule if missing
   ansible.builtin.command: iptables -A INPUT -p tcp --dport 443 -j ACCEPT
   when: https_rule_check.rc != 0
+  changed_when: true
 
-# Step 6: Save iptables rules
-- name: Save iptables rules to disk
-  ansible.builtin.command: service iptables save
+- name: Re-add REJECT rule to the end
+  ansible.builtin.command: iptables -A INPUT -j REJECT --reject-with icmp-host-prohibited
+  changed_when: true
+
+
+# === Step 5: Persist iptables Rules ===
+
+- name: Save current iptables rules
+  ansible.builtin.command: iptables-save
+  register: iptables_save
+  changed_when: false
+
+- name: Write iptables rules to config file
+  ansible.builtin.copy:
+    content: "{{ iptables_save.stdout }}"
+    dest: /etc/sysconfig/iptables
+    owner: root
+    group: root
+    mode: '0644'

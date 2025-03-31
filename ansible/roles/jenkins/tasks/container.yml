@@ -1,0 +1,38 @@
+---
+# Run and configure the Jenkins container
+
+# Check if Jenkins container is running
+- name: Check if Jenkins container is running
+  community.docker.docker_container:
+    name: jenkins
+    image: jenkins/jenkins:lts   # specify the image here to avoid the error
+    state: started
+  register: jenkins_status
+  ignore_errors: true  # Ignore errors here to ensure the status variable is always set
+
+# Start Jenkins container if not running
+- name: Start Jenkins container if not running
+  community.docker.docker_container:
+    name: jenkins
+    image: jenkins/jenkins:lts
+    state: started
+    restart_policy: always
+    published_ports:
+      - "8080:8080"
+      - "50000:50000"
+    volumes:
+      - /home/devops/jenkins_data:/var/jenkins_home
+      - /home/devops/jenkins_data/plugins.txt:/plugins.txt:ro
+      - /home/devops/jenkins_data/init.groovy.d:/usr/share/jenkins/ref/init.groovy.d:ro
+    env:
+      JENKINS_ADMIN_USER: "{{ jenkins_admin_user }}"
+      JENKINS_ADMIN_PASS: "{{ jenkins_admin_pass }}"
+      GITHUB_TOKEN: "{{ github_token }}"
+    user: root
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8080/login || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+  when: jenkins_status is not defined or jenkins_status.state != 'started'

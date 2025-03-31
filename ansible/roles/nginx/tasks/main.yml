@@ -35,7 +35,15 @@
     mode: '0644'
   when: inventory_hostname in groups['prod']
 
-# Step 3: Include certbot tasks (modularized in a separate file)
+# Step 3: Ensure certbot is available before running TLS provisioning
+- name: Install certbot and certbot-nginx plugin
+  ansible.builtin.package:
+    name:
+      - certbot
+      - python3-certbot-nginx
+    state: present
+
+# Step 4: Include certbot tasks (modularized in a separate file)
 - name: Include Certbot tasks
   ansible.builtin.include_tasks: certbot.yml
   tags: certbot

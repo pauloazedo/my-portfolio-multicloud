@@ -10,22 +10,27 @@
     mode: '0700'
 
 - name: Generate SSH keypair for Jenkins if it doesn't exist
-  ansible.builtin.command: >
-    ssh-keygen -t rsa -b 4096 -f /home/devops/.ssh/id_rsa_jenkins_ansible -N "" -C "jenkins@uat"
+  ansible.builtin.command:
+    cmd: >
+      ssh-keygen -t rsa -b 4096
+      -f /home/devops/.ssh/id_rsa_jenkins_ansible
+      -N "" -C "jenkins@uat"
   args:
     creates: /home/devops/.ssh/id_rsa_jenkins_ansible
   become: true
   become_user: devops
 
-- name: Read public key content
+- name: Read Jenkins public key content
   ansible.builtin.slurp:
     src: /home/devops/.ssh/id_rsa_jenkins_ansible.pub
   register: jenkins_ssh_pubkey
-  failed_when: jenkins_ssh_pubkey is not defined or jenkins_ssh_pubkey['content'] is not defined
+  failed_when: >
+    jenkins_ssh_pubkey is not defined or
+    jenkins_ssh_pubkey.content is not defined
 
 - name: Install Jenkins public key on all target hosts
   ansible.builtin.authorized_key:
     user: devops
     state: present
-    key: "{{ jenkins_ssh_pubkey['content'] | b64decode }}"
+    key: "{{ jenkins_ssh_pubkey.content | b64decode }}"
   become: true

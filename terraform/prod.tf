@@ -16,6 +16,14 @@ resource "oci_core_instance" "prod" {
   display_name        = "prod-instance"
   shape               = "VM.Standard.A1.Flex"
 
+  create_vnic_details {
+    subnet_id               = oci_core_subnet.prod_subnet.id
+    display_name            = "prod-vnic"
+    hostname_label   = "prod-instance"
+    assign_public_ip        = true
+    skip_source_dest_check  = false
+  }
+
   shape_config {
     ocpus         = 2
     memory_in_gbs = 12
@@ -41,24 +49,20 @@ resource "oci_core_instance" "prod" {
     source_id               = "ocid1.image.oc1.iad.aaaaaaaawvs4xn6dfl6oo45o2ntziecjy2cbet2mlidvx3ji62oi3jai4u5a"
     boot_volume_size_in_gbs = 55
   }
+
+  depends_on = [oci_core_subnet.prod_subnet]
 }
 
-# === VNIC CREATION WITH NSG ATTACHED ===
-resource "oci_core_vnic_attachment" "prod_vnic_attachment" {
-  instance_id = oci_core_instance.prod.id
-
-  create_vnic_details {
-    subnet_id              = oci_core_subnet.prod_subnet.id
-    display_name           = "prod-vnic"
-    assign_public_ip       = true
-    nsg_ids                = [oci_core_network_security_group.nsg.id]
-    skip_source_dest_check = false
-  }
+# === DATA SOURCE: Get VNIC attachment ===
+data "oci_core_vnic_attachments" "prod" {
+  compartment_id = oci_identity_compartment.devops_portfolio.id
+  instance_id    = oci_core_instance.prod.id
 }
 
-# === VNIC DATA SOURCE ===
+# === DATA SOURCE: Get VNIC info ===
 data "oci_core_vnic" "prod" {
-  vnic_id = oci_core_vnic_attachment.prod_vnic_attachment.vnic_id
+  vnic_id    = data.oci_core_vnic_attachments.prod.vnic_attachments[0].vnic_id
+  depends_on = [oci_core_instance.prod]
 }
 
 # === CLOUDFLARE DNS RECORD FOR PROD ===
@@ -66,7 +70,9 @@ resource "cloudflare_dns_record" "prod" {
   zone_id = var.cloudflare_zone_id
   name    = "prod"
   type    = "A"
-  content = data.oci_core_vnic.prod.public_ip_address
+  content = oci_core_instance.prod.public_ip
   ttl     = 300
   proxied = false
+
+  depends_on = [oci_core_instance.prod]
 }

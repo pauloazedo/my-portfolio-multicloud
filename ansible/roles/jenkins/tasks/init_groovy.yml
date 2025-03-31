@@ -1,0 +1,18 @@
+---
+# Prepare Groovy init scripts for Jenkins container
+
+- name: Ensure Jenkins Groovy init directory exists
+  ansible.builtin.file:
+    path: /home/devops/jenkins_data/init.groovy.d
+    state: directory
+    owner: devops
+    group: devops
+    mode: '0755'
+
+- name: Copy admin user Groovy bootstrap script
+  ansible.builtin.copy:
+    src: 01-admin-user.groovy
+    dest: /home/devops/jenkins_data/init.groovy.d/01-admin-user.groovy
+    owner: devops
+    group: devops
+    mode: '0644'

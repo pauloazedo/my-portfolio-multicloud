@@ -1,5 +1,11 @@
 ---
+# Handlers for hardening role
+
+- name: Refresh DNF cache
+  ansible.builtin.command: dnf makecache
+  changed_when: true
+
 - name: Restart fail2ban
-  ansible.builtin.systemd:
+  ansible.builtin.service:
     name: fail2ban
     state: restarted

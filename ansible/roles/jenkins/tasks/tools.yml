@@ -1,0 +1,12 @@
+---
+# Install Python, Ansible, and OCI SDK inside Jenkins container
+
+- name: Install Python, pip, Ansible, and OCI SDK inside Jenkins container
+  community.docker.docker_container_exec:
+    container: jenkins
+    command: >
+      bash -c "apt-get update &&
+               apt-get install -y python3-venv python3-pip &&
+               python3 -m venv /home/jenkins/venv &&
+               /home/jenkins/venv/bin/pip install --upgrade pip &&
+               /home/jenkins/venv/bin/pip install ansible oci"

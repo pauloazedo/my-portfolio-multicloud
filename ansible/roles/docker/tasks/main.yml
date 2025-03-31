@@ -16,9 +16,9 @@
     name: docker-ce-stable
     description: Docker CE Stable - $basearch
     baseurl: https://download.docker.com/linux/centos/9/aarch64/stable
-    gpgcheck: yes
+    gpgcheck: true
     gpgkey: https://download.docker.com/linux/centos/gpg
-    enabled: yes
+    enabled: true
 
 # Step 3: Install Docker CE, CLI, and containerd
 - name: Install Docker CE, CLI and containerd
@@ -30,13 +30,17 @@
     state: present
 
 # Step 4: Load iptables NAT modules (for networking)
-- name: Load iptables NAT modules
-  ansible.builtin.shell: |
-    modprobe ip_tables
-    modprobe iptable_nat
-    modprobe ip_conntrack
-  args:
-    warn: false
+- name: Load ip_tables
+  ansible.builtin.command: modprobe ip_tables
+  changed_when: false
+
+- name: Load iptable_nat
+  ansible.builtin.command: modprobe iptable_nat
+  changed_when: false
+
+- name: Load ip_conntrack
+  ansible.builtin.command: modprobe ip_conntrack
+  changed_when: false
 
 # Step 5: Enable and start Docker
 - name: Enable and start Docker service (with restart)
@@ -50,4 +54,4 @@
   ansible.builtin.user:
     name: "{{ ansible_user }}"
     groups: docker
-    append: yes
+    append: true

@@ -1,61 +1,81 @@
 ---
-# Run certbot to generate TLS certs and update configs
+# Generate Let's Encrypt certs and update NGINX configs per environment
 
-- name: Generate HTTPS cert for Jenkins
+# Step 1: Define domains and templates per environment
+- name: Define domains and templates per environment
+  ansible.builtin.set_fact:
+    nginx_certbot_domains:
+      - domain: "jenkins.pauloazedo.us"
+        template: "jenkins-https.conf.j2"
+        filename: "jenkins.conf"
+        group: "uat"
+      - domain: "uat.pauloazedo.us"
+        template: "uat-https.conf.j2"
+        filename: "uat.conf"
+        group: "uat"
+      - domain: "prod.pauloazedo.us"
+        template: "prod-https.conf.j2"
+        filename: "prod.conf"
+        group: "prod"
+
+# Step 2:Extract domains relevant to this host (based on group membership)
+- name: Extract domains for this host only
+  ansible.builtin.set_fact:
+    certbot_domains_for_host: >-
+      {{
+        nginx_certbot_domains
+        | selectattr('group', 'in', group_names)
+        | map(attribute='domain')
+        | list
+      }}
+
+# Step 3: Build full list of Certbot paths to delete (if force cleanup is enabled)
+- name: Build full list of Certbot paths to delete
+  ansible.builtin.set_fact:
+    certbot_paths_to_cleanup: >-
+      {{
+        (certbot_domains_for_host | map('regex_replace', '^(.*)$', 'live/\\1') | list)
+        + (certbot_domains_for_host | map('regex_replace', '^(.*)$', 'archive/\\1') | list)
+        + (certbot_domains_for_host | map('regex_replace', '^(.*)$', 'renewal/\\1.conf') | list)
+      }}
+  when: certbot_force_clean | default(false) | bool
+
+# Step 4: Remove previous Certbot state from filesystem
+- name: Clean up previous Certbot state (optional safety for retrying)
+  ansible.builtin.file:
+    path: "/etc/letsencrypt/{{ item }}"
+    state: absent
+  loop: "{{ certbot_paths_to_cleanup }}"
+  when: certbot_force_clean | default(false) | bool
+  tags: certbot
+
+# Step 5: Generate HTTPS certificates using Certbot for each domain (on matching hosts)
+- name: Generate HTTPS certs with Certbot
   ansible.builtin.command:
     cmd: >
-      certbot certonly --nginx -d jenkins.pauloazedo.us --non-interactive
-      --agree-tos -m pauloazedo@pauloazedo.us --redirect
-  register: certbot_jenkins
-  changed_when: certbot_jenkins.rc == 0
-  failed_when: certbot_jenkins.rc != 0
+      certbot certonly --nginx -d {{ item.domain }}
+      --non-interactive --agree-tos
+      -m pauloazedo@pauloazedo.us --redirect
+  register: certbot_result
+  changed_when: certbot_result.rc == 0
+  failed_when: certbot_result.rc != 0
+  loop: "{{ nginx_certbot_domains }}"
+  when: inventory_hostname in groups[item.group]
   tags: certbot
-  when: inventory_hostname in groups['uat']
 
-- name: Generate HTTPS cert for UAT
-  ansible.builtin.command:
-    cmd: >
-      certbot certonly --nginx -d uat.pauloazedo.us --non-interactive
-      --agree-tos -m pauloazedo@pauloazedo.us --redirect
-  register: certbot_uat
-  changed_when: certbot_uat.rc == 0
-  failed_when: certbot_uat.rc != 0
+# Step 6: Replace HTTP config with HTTPS config (for domains on this host)
+- name: Replace NGINX config with HTTPS version
+  ansible.builtin.template:
+    src: "{{ item.template }}"
+    dest: "/etc/nginx/conf.d/{{ item.filename }}"
+    mode: '0644'
+  loop: "{{ nginx_certbot_domains }}"
+  when: inventory_hostname in groups[item.group]
   tags: certbot
-  when: inventory_hostname in groups['uat']
 
-- name: Generate HTTPS cert for PROD
-  ansible.builtin.command:
-    cmd: >
-      certbot certonly --nginx -d prod.pauloazedo.us --non-interactive
-      --agree-tos -m pauloazedo@pauloazedo.us --redirect
-  register: certbot_prod
-  changed_when: certbot_prod.rc == 0
-  failed_when: certbot_prod.rc != 0
-  tags: certbot
-  when: inventory_hostname in groups['prod']
-
-- name: Replace Jenkins config with HTTPS
-  ansible.builtin.template:
-    src: jenkins-https.conf.j2
-    dest: /etc/nginx/conf.d/jenkins.conf
-    mode: '0644'
-  when: inventory_hostname in groups['uat']
-
-- name: Replace UAT config with HTTPS
-  ansible.builtin.template:
-    src: uat-https.conf.j2
-    dest: /etc/nginx/conf.d/uat.conf
-    mode: '0644'
-  when: inventory_hostname in groups['uat']
-
-- name: Replace PROD config with HTTPS
-  ansible.builtin.template:
-    src: prod-https.conf.j2
-    dest: /etc/nginx/conf.d/prod.conf
-    mode: '0644'
-  when: inventory_hostname in groups['prod']
-
+# Step 7: Reload NGINX to apply new HTTPS config
 - name: Reload NGINX
   ansible.builtin.service:
     name: nginx
     state: reloaded
+  tags: certbot

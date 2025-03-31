@@ -1,24 +1,138 @@
 ---
-- name: Ensure Docker is installed on UAT
+# PROD Site Deployment - Blue/Green with automatic waiting fallback and image labeling
+
+# Step 1: Ensure Docker is installed
+- name: Ensure Docker is installed
   ansible.builtin.include_role:
     name: docker
-  tags: always  # this ensures Docker is always ensured regardless of tag
+  tags: always
 
-- name: Create placeholder index.html for UAT
-  ansible.builtin.copy:
-    content: "<html><body><h1>UAT Environment - Awaiting first deployment</h1></body></html>"
-    dest: /home/devops/uat_index.html
-    owner: devops
-    group: devops
-    mode: '0644'
+# Step 2: Authenticate to OCIR
+- name: Fetch OCIR token from OCI Vault (with retry logic)
+  ansible.builtin.set_fact:
+    ocir_token: >-
+      {{
+        lookup('pipe', playbook_dir ~ '/scripts/fetch_vault_secret.sh ' ~ ocir_token_ocid)
+      }}
 
-- name: Run UAT placeholder container
+- name: Check if already logged into OCIR
+  ansible.builtin.command: docker info
+  register: docker_info_check
+  failed_when: false
+  changed_when: false
+
+- name: Login to OCIR (only if not already logged in)
+  ansible.builtin.command:
+    cmd: >
+      docker login iad.ocir.io
+      -u {{ ocir_user }}
+      -p {{ ocir_token }}
+  when: docker_info_check.stdout is not search('iad.ocir.io')
+  no_log: true
+  changed_when: false
+
+# Step 3: Try to pull green/blue images
+- name: Try to pull green image
+  community.docker.docker_image:
+    name: "{{ prod_site_green_image }}"
+    source: pull
+  register: green_image_check
+  failed_when: false
+  ignore_errors: true
+
+- name: Try to pull blue image
+  community.docker.docker_image:
+    name: "{{ prod_site_blue_image }}"
+    source: pull
+  register: blue_image_check
+  failed_when: false
+  ignore_errors: true
+
+# Step 4: Conditionally build prod-waiting image if green and blue don't exist
+- name: Build prod-waiting fallback image (labeled)
+  community.docker.docker_image:
+    name: "prod-waiting"
+    tag: "latest"
+    source: build
+    build:
+      path: "{{ playbook_dir }}/files"
+      dockerfile: prod-waiting.Dockerfile
+      labels:
+        org.opencontainers.image.created: "{{ ansible_date_time.iso8601 }}"
+        org.opencontainers.image.description: "Fallback PROD site - waiting for Jenkins"
+        org.opencontainers.image.source: "ansible"
+  when: green_image_check.failed | default(true)
+        and blue_image_check.failed | default(true)
+
+- name: Tag prod-waiting image for OCIR
+  ansible.builtin.command:
+    cmd: >
+      docker tag prod-waiting:latest
+      {{ prod_site_waiting_image }}
+  when: green_image_check.failed | default(true)
+        and blue_image_check.failed | default(true)
+  changed_when: false
+
+- name: Push prod-waiting image to OCIR
+  ansible.builtin.command:
+    cmd: >
+      docker push
+      {{ prod_site_waiting_image }}
+  when: green_image_check.failed | default(true)
+        and blue_image_check.failed | default(true)
+  changed_when: false
+
+# Step 5: Stop any old containers
+- name: Stop and remove green container
   community.docker.docker_container:
-    name: uat-site
-    image: nginx:alpine
+    name: "{{ prod_site_green_container }}"
+    state: absent
+    force_kill: true
+
+- name: Stop and remove blue container
+  community.docker.docker_container:
+    name: "{{ prod_site_blue_container }}"
+    state: absent
+    force_kill: true
+
+# Step 6: Start green container
+- name: Start green container with real image
+  community.docker.docker_container:
+    name: "{{ prod_site_green_container }}"
+    image: "{{ prod_site_green_image }}"
     restart_policy: always
     published_ports:
-      - "{{ uat_site_port }}:80"
-    volumes:
-      - /home/devops/uat_index.html:/usr/share/nginx/html/index.html:ro
+      - "{{ prod_site_green_port }}:3000"
     state: started
+  when: not green_image_check.failed | default(true)
+
+- name: Start green container with fallback
+  community.docker.docker_container:
+    name: "{{ prod_site_green_container }}"
+    image: "{{ prod_site_waiting_image }}"
+    restart_policy: always
+    published_ports:
+      - "{{ prod_site_green_port }}:3000"
+    state: started
+  when: green_image_check.failed | default(true)
+
+# Step 7: Start blue container
+- name: Start blue container with real image
+  community.docker.docker_container:
+    name: "{{ prod_site_blue_container }}"
+    image: "{{ prod_site_blue_image }}"
+    restart_policy: always
+    published_ports:
+      - "{{ prod_site_blue_port }}:3000"
+    state: started
+  when: not blue_image_check.failed | default(true)
+
+- name: Start blue container with fallback
+  community.docker.docker_container:
+    name: "{{ prod_site_blue_container }}"
+    image: "{{ prod_site_waiting_image }}"
+    restart_policy: always
+    published_ports:
+      - "{{ prod_site_blue_port }}:3000"
+    state: started
+  when: blue_image_check.failed | default(true)

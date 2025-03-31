@@ -1,0 +1,20 @@
+---
+# Final configuration steps for Jenkins once it's running
+
+- name: Wait for Jenkins to become responsive
+  ansible.builtin.uri:
+    url: http://localhost:8080/login
+    status_code: 200
+    return_content: false
+  register: jenkins_status
+  retries: 10
+  delay: 15
+  until: jenkins_status.status == 200
+
+# Example: Place for additional CLI init, seed jobs, etc.
+# - name: Run CLI-based initialization steps (if needed)
+#   ansible.builtin.command: >
+#     java -jar /var/jenkins_home/jenkins-cli.jar -s http://localhost:8080 ...
+#   environment:
+#     JENKINS_USER_ID: "{{ jenkins_admin_user }}"
+#     JENKINS_API_TOKEN: "{{ jenkins_admin_token }}"

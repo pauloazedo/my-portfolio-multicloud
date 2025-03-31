@@ -16,10 +16,26 @@ resource "oci_core_instance" "uat" {
   display_name        = "uat-instance"
   shape               = "VM.Standard.A1.Flex"
 
+  create_vnic_details {
+    subnet_id              = oci_core_subnet.uat_subnet.id
+    display_name           = "uat-vnic"
+    hostname_label         = "uat-instance"
+    assign_public_ip       = true
+    skip_source_dest_check = false
+
+    nsg_ids = [
+      oci_core_network_security_group.nsg.id
+    ]
+  }
+
   shape_config {
     ocpus         = 2
     memory_in_gbs = 12
   }
+
+defined_tags = {
+  "${data.oci_identity_tag_namespaces.devops.tag_namespaces[0].name}.${data.oci_identity_tags.access.tags[0].name}" = "vault"
+}
 
   metadata = {
     ssh_authorized_keys = file(var.ssh_public_key_path)
@@ -37,46 +53,44 @@ resource "oci_core_instance" "uat" {
   }
 
   source_details {
-    source_type               = "image"
-    source_id                 = "ocid1.image.oc1.iad.aaaaaaaawvs4xn6dfl6oo45o2ntziecjy2cbet2mlidvx3ji62oi3jai4u5a"
-    boot_volume_size_in_gbs   = 55
+    source_type             = "image"
+    source_id               = "ocid1.image.oc1.iad.aaaaaaaawvs4xn6dfl6oo45o2ntziecjy2cbet2mlidvx3ji62oi3jai4u5a"
+    boot_volume_size_in_gbs = 55
   }
+
+  depends_on = [data.oci_identity_tags.access]
 }
 
-# === VNIC CREATION WITH NSG ATTACHED ===
-resource "oci_core_vnic_attachment" "uat_vnic_attachment" {
-  instance_id = oci_core_instance.uat.id
-
-  create_vnic_details {
-    subnet_id              = oci_core_subnet.uat_subnet.id
-    display_name           = "uat-vnic"
-    assign_public_ip       = true
-    nsg_ids                = [oci_core_network_security_group.nsg.id]
-    skip_source_dest_check = false
-  }
+# === VNIC and Public IP ===
+data "oci_core_vnic_attachments" "uat" {
+  compartment_id = oci_identity_compartment.devops_portfolio.id
+  instance_id    = oci_core_instance.uat.id
 }
 
-# === VNIC DATA SOURCE ===
 data "oci_core_vnic" "uat" {
-  vnic_id = oci_core_vnic_attachment.uat_vnic_attachment.vnic_id
+  vnic_id    = data.oci_core_vnic_attachments.uat.vnic_attachments[0].vnic_id
+  depends_on = [oci_core_instance.uat]
 }
 
-# === CLOUDFLARE DNS RECORD FOR UAT ===
+# === CLOUDFLARE DNS ===
 resource "cloudflare_dns_record" "uat" {
   zone_id = var.cloudflare_zone_id
   name    = "uat"
   type    = "A"
-  content = data.oci_core_vnic.uat.public_ip_address
+  content = oci_core_instance.uat.public_ip
   ttl     = 300
   proxied = false
+
+  depends_on = [oci_core_instance.uat]
 }
 
-# === CLOUDFLARE DNS RECORD FOR JENKINS ===
 resource "cloudflare_dns_record" "jenkins" {
   zone_id = var.cloudflare_zone_id
   name    = "jenkins"
   type    = "A"
-  content = data.oci_core_vnic.uat.public_ip_address
+  content = oci_core_instance.uat.public_ip
   ttl     = 300
   proxied = false
+
+  depends_on = [oci_core_instance.uat]
 }

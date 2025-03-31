@@ -1,10 +1,10 @@
 ---
 # System bootstrap tasks for Oracle Linux 9 (OL9 only)
 
-- name: Update all system packages to latest version
+- name: Update all system packages
   ansible.builtin.dnf:
     name: "*"
-    state: latest
+    state: present
     update_cache: true
   tags: update
 
