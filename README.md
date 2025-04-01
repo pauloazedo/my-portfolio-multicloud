@@ -1,5 +1,11 @@
 # my-portfolio-oci-devops
 
+![Terraform](https://img.shields.io/badge/Terraform-v1.4+-623CE4?logo=terraform&logoColor=white)
+![Ansible](https://img.shields.io/badge/Ansible-Automation-EE0000?logo=ansible)
+![Jenkins](https://img.shields.io/badge/Jenkins-CI/CD-D24939?logo=jenkins)
+![OCI](https://img.shields.io/badge/Oracle%20Cloud-Infrastructure-F80000?logo=oracle)
+![License](https://img.shields.io/badge/license-MIT-green)
+
 A fully automated, production-ready infrastructure stack to host a personal technical portfolio on Oracle Cloud Infrastructure (OCI), leveraging Terraform, Ansible, Jenkins, and modern DevOps practices.
 
 ---
@@ -11,26 +17,12 @@ A fully automated, production-ready infrastructure stack to host a personal tech
 3. [Technology Stack](#technology-stack)
 4. [Repository Structure](#repository-structure)
 5. [Getting Started](#getting-started)
-   - [Prerequisites](#prerequisites)
-   - [Environment Setup](#environment-setup)
 6. [Infrastructure Provisioning (Terraform)](#infrastructure-provisioning-terraform)
-   - [Secrets Management (OCI Vault)](#secrets-management-oci-vault)
-   - [Environments: UAT and PROD](#environments-uat-and-prod)
-   - [Cloudflare DNS Integration](#cloudflare-dns-integration)
 7. [Configuration Management (Ansible)](#configuration-management-ansible)
-   - [Roles Breakdown](#roles-breakdown)
-   - [Fail2Ban and iptables Hardening](#fail2ban-and-iptables-hardening)
-   - [NGINX + Let's Encrypt Setup](#nginx--lets-encrypt-setup)
-   - [Jenkins Container Deployment](#jenkins-container-deployment)
 8. [CI/CD Pipeline](#cicd-pipeline)
-   - [GitHub Integration](#github-integration)
-   - [Automated Builds and Deployments](#automated-builds-and-deployments)
 9. [Monitoring & Logging (Planned)](#monitoring--logging-planned)
 10. [Security Considerations](#security-considerations)
-11. [Portfolio Website (Next.js + Tailwind)](#portfolio-website-nextjs--tailwind)
-   - [Project Structure](#project-structure)
-   - [Features and Pages](#features-and-pages)
-   - [Deployment Strategy](#deployment-strategy)
+11. [Portfolio Website](#portfolio-website)
 12. [Future Improvements](#future-improvements)
 13. [License](#license)
 
@@ -38,52 +30,49 @@ A fully automated, production-ready infrastructure stack to host a personal tech
 
 ## Project Overview
 
-Brief description of the project's goal — showcasing your DevOps capabilities through infrastructure-as-code, secure automation, and a professional portfolio website hosted entirely on OCI.
+A full-stack, containerized DevOps showcase hosted on OCI, demonstrating automation, IaC, CI/CD, and security best practices for modern infrastructure projects.
+
+---
 
 ## Architecture Diagram
 
-> Add a simple diagram showing:
-- OCI infrastructure (VCN, Subnets, Instances)
-- Jenkins CI/CD pipeline
-- DNS/SSL via Cloudflare & Let's Encrypt
-- Next.js frontend hosted in containers
-- Separation of UAT and PROD
+> _[Insert your architecture diagram here – you can link a PNG or embed a markdown image]_  
+> Suggested components:
+> - OCI compute, networking, Vault
+> - Terraform + Ansible flows
+> - Jenkins pipeline steps
+> - UAT and PROD targets
+> - Certbot + NGINX SSL routing
+
+---
 
 ## Technology Stack
 
 - **Cloud**: Oracle Cloud Infrastructure (OCI)
 - **IaC**: Terraform
-- **Configuration Management**: Ansible
+- **Automation**: Ansible
 - **CI/CD**: Jenkins
+- **Containerization**: Docker
 - **DNS**: Cloudflare
+- **Security**: iptables, Fail2Ban, OCI Vault
 - **Frontend**: React + Next.js + Tailwind CSS
-- **Security**: Fail2Ban, iptables, OCI Vault
+
+---
 
 ## Repository Structure
 
-<pre>
-<code>
+```
 .
-├── terraform/
-│   ├── main.tf
-│   ├── uat.tf
-│   ├── prod.tf
-│   └── variables.tf
-├── ansible/
-│   ├── site.yml
-│   ├── group_vars/
-│   └── roles/
-│       ├── hardening/
-│       ├── nginx/
-│       └── jenkins/
-├── portfolio/               # Next.js application
-│   ├── pages/
-│   ├── components/
-│   ├── tailwind.config.js
-│   └── Jenkinsfile
-</code>
-</pre>
+├── my-portfolio/
+│   └── frontend/         # [Next.js website — see full details here](my-portfolio/frontend/README.md)
+├── terraform/            # OCI provisioning (VCNs, instances, DNS)
+├── ansible/              # Automation roles (Jenkins, NGINX, hardening, etc.)
+├── Jenkinsfile           # CI/CD orchestrator
+├── run.sh                # Automation entry point
+└── README.md
+```
 
+---
 
 ## Getting Started
 
@@ -92,128 +81,83 @@ Brief description of the project's goal — showcasing your DevOps capabilities 
 - OCI CLI
 - Terraform (>= 1.4)
 - Ansible
-- Git + SSH key pair
-- Python 3 (for OCI SDK if needed)
+- SSH Key Pair
+- Python 3 with `oci` SDK
 
-### Environment Setup
+### Quick Start
 
-1. Clone the repo
-2. Configure `.env`, `terraform.tfvars`, and secrets in OCI Vault
-3. Generate API keys for Terraform + Ansible automation
+```bash
+git clone https://github.com/youruser/my-portfolio-oci-devops.git
+cd my-portfolio-oci-devops
+./run.sh            # runs terraform + ansible playbook
+```
+
+> Before running, configure your `terraform.tfvars` and OCI Vault secrets.
 
 ---
 
 ## Infrastructure Provisioning (Terraform)
 
-### Secrets Management (OCI Vault)
-
-- List of required secrets:
-  - `jenkins_admin_user`
-  - `jenkins_admin_pass`
-  - `github_token`
-  - `ansible_vault_pass`
-
-### Environments: UAT and PROD
-
-- Each with isolated subnets
-- Separate compute instances
-- Distinct DNS records
-
-### Cloudflare DNS Integration
-
-- DNS records for:
-  - `uat.pauloazedo.us`
-  - `prod.pauloazedo.us`
-  - `jenkins.pauloazedo.us`
+- UAT and PROD environments defined via separate `.tf` files
+- Subnets, compute, and DNS zones provisioned dynamically
+- Cloudflare DNS integration for automated IP registration
 
 ---
 
 ## Configuration Management (Ansible)
 
-### Roles Breakdown
-
-- `hardening`: Fail2Ban + iptables
-- `nginx`: Reverse proxy + HTTPS + Certbot
-- `jenkins`: Container setup + plugins
-
-### Fail2Ban and iptables Hardening
-
-- Secures SSH, HTTP, HTTPS ports
-- Rules persisted via `iptables-persistent`
-
-### NGINX + Let's Encrypt Setup
-
-- HTTP-first deploy → HTTPS upgrade after certs issued
-- Automatic renewal with Certbot
-
-### Jenkins Container Deployment
-
-- Non-root, secure container setup
-- Accessible at `jenkins.pauloazedo.us`
+- Roles for:
+  - `jenkins`: Dockerized Jenkins setup with admin automation
+  - `nginx`: Reverse proxy + HTTPS with Let's Encrypt
+  - `hardening`: iptables + Fail2Ban security baseline
+  - `uat_site` and `prod_site`: Docker deployment of frontend
 
 ---
 
 ## CI/CD Pipeline
 
-### GitHub Integration
-
-- Webhooks to Jenkins
-- GitOps model with automated deployment
-
-### Automated Builds and Deployments
-
-- Build and test Next.js site
-- Push Docker image to OCI Artifact Registry (future)
-- Redeploy to UAT or PROD
+- Jenkins pulls from GitHub on commit
+- Builds Next.js site via `npm run build`
+- Optionally pushes Docker images to OCI Artifact Registry
+- Auto-deploys to UAT or PROD using Ansible
 
 ---
 
 ## Monitoring & Logging (Planned)
 
-> Placeholder for integrating Prometheus, Loki, or Grafana in future phases.
+Planned additions:
+- Prometheus node exporter
+- NGINX and Jenkins logging
+- Central log aggregation with Loki or fluentd
 
 ---
 
 ## Security Considerations
 
-- Minimal open ports
-- Hardened OS setup
-- All secrets stored in OCI Vault
-- No containers running as root
+- SSH hardened
+- Secrets stored in OCI Vault
+- No containers run as root
+- HTTPS enforced across all endpoints
 
 ---
 
-## Portfolio Website (Next.js + Tailwind)
+## Portfolio Website
 
-### Project Structure
-
-- Built with TypeScript, Tailwind CSS
-- React SPA hosted in Docker container
-
-### Features and Pages
-
-- About Me
-- Skills
-- Certifications (Credly badges)
-- Timeline for Education & Work
-- Contact section
-
-### Deployment Strategy
-
-- Static build from Jenkins
-- Reverse-proxied via NGINX on UAT/PROD
+- Fully described in [`my-portfolio/frontend/README.md`](my-portfolio/frontend/README.md)
+- Live UAT: `https://uat.pauloazedo.us`
+- Live PROD: `https://prod.pauloazedo.us`
 
 ---
 
 ## Future Improvements
 
-- Add CI steps for Terraform plan/apply with approvals
-- Use Molecule for Ansible testing
-- Add backup strategy and monitoring
-- Integrate GCP or AWS alternative infrastructure
+- Add CI steps for `terraform plan` and `terraform apply`
+- Add Molecule role testing
+- Integrate OCI notifications or Slack alerts
+- Support for additional cloud providers (GCP, AWS)
 
 ---
 
 ## License
 
-MIT License (or choose another)
+MIT License — fork, reuse, improve.

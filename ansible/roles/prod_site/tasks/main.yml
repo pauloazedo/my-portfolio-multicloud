@@ -1,5 +1,5 @@
 ---
-# PROD Site Deployment - Blue/Green with automatic waiting fallback and image labeling
+# PROD Site Deployment - Blue/Green with fallback and image labeling
 
 # Step 1: Ensure Docker is installed
 - name: Ensure Docker is installed
@@ -7,21 +7,14 @@
     name: docker
   tags: always
 
-# Step 2: Authenticate to OCIR
-- name: Fetch OCIR token from OCI Vault (with retry logic)
-  ansible.builtin.set_fact:
-    ocir_token: >-
-      {{
-        lookup('pipe', playbook_dir ~ '/scripts/fetch_vault_secret.sh ' ~ ocir_token_ocid)
-      }}
-
+# Step 2: Authenticate to OCIR (if not already logged in)
 - name: Check if already logged into OCIR
   ansible.builtin.command: docker info
   register: docker_info_check
   failed_when: false
   changed_when: false
 
-- name: Login to OCIR (only if not already logged in)
+- name: Login to OCIR (if not already logged in)
   ansible.builtin.command:
     cmd: >
       docker login iad.ocir.io
@@ -31,7 +24,7 @@
   no_log: true
   changed_when: false
 
-# Step 3: Try to pull green/blue images
+# Step 3: Try pulling green and blue images from OCIR
 - name: Try to pull green image
   community.docker.docker_image:
     name: "{{ prod_site_green_image }}"
@@ -48,41 +41,69 @@
   failed_when: false
   ignore_errors: true
 
-# Step 4: Conditionally build prod-waiting image if green and blue don't exist
-- name: Build prod-waiting fallback image (labeled)
+# Step 4: Set image availability flags
+- name: Set image availability flags
+  ansible.builtin.set_fact:
+    green_image_available: >-
+      {{ ('Image is up to date' in green_image_check.msg)
+         or ('Downloaded newer image' in green_image_check.msg) }}
+    blue_image_available: >-
+      {{ ('Image is up to date' in blue_image_check.msg)
+         or ('Downloaded newer image' in blue_image_check.msg) }}
+
+- name: Show green/blue image availability
+  ansible.builtin.debug:
+    msg: >
+      Green: {{ green_image_available | default(false) }},
+      Blue: {{ blue_image_available | default(false) }}
+
+# Step 5: Build and push fallback image if both fail
+- name: Copy fallback PROD Dockerfile to remote host
+  ansible.builtin.copy:
+    src: files/prod-waiting.Dockerfile
+    dest: /home/devops/prod-waiting.Dockerfile
+    owner: devops
+    group: devops
+    mode: '0644'
+  when: not green_image_available and not blue_image_available
+
+- name: Build prod-waiting fallback image (local tag)
   community.docker.docker_image:
     name: "prod-waiting"
     tag: "latest"
     source: build
     build:
-      path: "{{ playbook_dir }}/files"
+      path: /home/devops
       dockerfile: prod-waiting.Dockerfile
       labels:
         org.opencontainers.image.created: "{{ ansible_date_time.iso8601 }}"
         org.opencontainers.image.description: "Fallback PROD site - waiting for Jenkins"
         org.opencontainers.image.source: "ansible"
-  when: green_image_check.failed | default(true)
-        and blue_image_check.failed | default(true)
+  when: not green_image_available and not blue_image_available
 
-- name: Tag prod-waiting image for OCIR
+- name: Tag fallback image for OCIR
   ansible.builtin.command:
     cmd: >
-      docker tag prod-waiting:latest
-      {{ prod_site_waiting_image }}
-  when: green_image_check.failed | default(true)
-        and blue_image_check.failed | default(true)
-  changed_when: false
+      docker tag prod-waiting:latest {{ prod_site_waiting_image }}
+  when: not green_image_available and not blue_image_available
+  changed_when: true
+  check_mode: false
 
-- name: Push prod-waiting image to OCIR
+- name: Push fallback image to OCIR
   ansible.builtin.command:
     cmd: >
-      docker push
-      {{ prod_site_waiting_image }}
-  when: green_image_check.failed | default(true)
-        and blue_image_check.failed | default(true)
-  changed_when: false
+      docker push {{ prod_site_waiting_image }}
+  when: not green_image_available and not blue_image_available
+  changed_when: true
+  check_mode: false
 
-# Step 5: Stop any old containers
+- name: Clean up temporary PROD Dockerfile from remote host
+  ansible.builtin.file:
+    path: /home/devops/prod-waiting.Dockerfile
+    state: absent
+  when: not green_image_available and not blue_image_available
+
+# Step 6: Stop and remove any existing containers
 - name: Stop and remove green container
   community.docker.docker_container:
     name: "{{ prod_site_green_container }}"
@@ -95,7 +116,7 @@
     state: absent
     force_kill: true
 
-# Step 6: Start green container
+# Step 7: Start green container (real or fallback)
 - name: Start green container with real image
   community.docker.docker_container:
     name: "{{ prod_site_green_container }}"
@@ -104,9 +125,9 @@
     published_ports:
       - "{{ prod_site_green_port }}:3000"
     state: started
-  when: not green_image_check.failed | default(true)
+  when: green_image_available | default(false)
 
-- name: Start green container with fallback
+- name: Start green container with fallback image
   community.docker.docker_container:
     name: "{{ prod_site_green_container }}"
     image: "{{ prod_site_waiting_image }}"
@@ -114,9 +135,9 @@
     published_ports:
       - "{{ prod_site_green_port }}:3000"
     state: started
-  when: green_image_check.failed | default(true)
+  when: not green_image_available | default(false)
 
-# Step 7: Start blue container
+# Step 8: Start blue container (real or fallback)
 - name: Start blue container with real image
   community.docker.docker_container:
     name: "{{ prod_site_blue_container }}"
@@ -125,9 +146,9 @@
     published_ports:
       - "{{ prod_site_blue_port }}:3000"
     state: started
-  when: not blue_image_check.failed | default(true)
+  when: blue_image_available | default(false)
 
-- name: Start blue container with fallback
+- name: Start blue container with fallback image
   community.docker.docker_container:
     name: "{{ prod_site_blue_container }}"
     image: "{{ prod_site_waiting_image }}"
@@ -135,4 +156,4 @@
     published_ports:
       - "{{ prod_site_blue_port }}:3000"
     state: started
-  when: blue_image_check.failed | default(true)
+  when: not blue_image_available | default(false)

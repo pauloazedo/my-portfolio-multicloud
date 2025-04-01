@@ -1,2 +1,11 @@
+# ansible/files/uat-waiting.Dockerfile
+
 FROM nginx:alpine
-RUN echo "UAT server ready. Waiting for Jenkins to publish latest image..." > /usr/share/nginx/html/index.html
+
+# Copy full NGINX config to expected path
+COPY default-waiting.conf /etc/nginx/nginx.conf
+
+# Set static fallback page content
+COPY index.html /usr/share/nginx/html/index.html
+
+EXPOSE 3000

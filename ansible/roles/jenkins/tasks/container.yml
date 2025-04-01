@@ -1,16 +1,14 @@
 ---
 # Run and configure the Jenkins container
 
-# Check if Jenkins container is running
-- name: Check if Jenkins container is running
-  community.docker.docker_container:
+# Step 1: Check if Jenkins container exists and get its status
+- name: Check if Jenkins container exists
+  community.docker.docker_container_info:
     name: jenkins
-    image: jenkins/jenkins:lts   # specify the image here to avoid the error
-    state: started
   register: jenkins_status
-  ignore_errors: true  # Ignore errors here to ensure the status variable is always set
+  ignore_errors: true  # Avoid fatal failure if the container doesn't exist
 
-# Start Jenkins container if not running
+# Step 2: Start Jenkins container if not already running
 - name: Start Jenkins container if not running
   community.docker.docker_container:
     name: jenkins
@@ -35,4 +33,8 @@
       timeout: 10s
       retries: 5
       start_period: 30s
-  when: jenkins_status is not defined or jenkins_status.state != 'started'
+  when: >
+    jenkins_status.container is not defined
+    or jenkins_status.container is none
+    or jenkins_status.container.State.Status != 'running'
+

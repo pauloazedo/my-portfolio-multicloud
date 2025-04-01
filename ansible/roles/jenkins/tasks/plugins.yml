@@ -5,10 +5,13 @@
   community.docker.docker_container_exec:
     container: jenkins
     command: >
-      cat /plugins.txt | xargs jenkins-plugin-cli --plugins
+      sh -c "jenkins-plugin-cli --plugins < /plugins.txt"
+  register: plugin_install_result
 
 - name: Restart Jenkins to apply plugin changes
   community.docker.docker_container:
     name: jenkins
-    state: restarted
-  when: result.rc == 0
+    state: started
+    restart: true
+  when: plugin_install_result.rc | default(1) == 0
+

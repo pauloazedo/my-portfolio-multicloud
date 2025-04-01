@@ -27,8 +27,8 @@ ocir_user: "idtijq8cx4jl/devops.user"
 # UAT Site Configuration
 ############################################################
 
-uat_site_image: "iad.ocir.io/{{ ocir_namespace }}/uat-site:latest"
-uat_site_waiting_image: "iad.ocir.io/{{ ocir_namespace }}/uat-waiting:latest"
+uat_site_image: "iad.ocir.io/{{ ocir_namespace ~ '/uat-site:latest' }}"
+uat_site_waiting_image: "iad.ocir.io/{{ ocir_namespace ~ '/uat-waiting:latest' }}"
 uat_site_container: "uat-site"
 uat_site_port: 3000
 

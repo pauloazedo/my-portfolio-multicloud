@@ -13,7 +13,14 @@
     state: started
     enabled: true
 
-# Step 2: Deploy initial HTTP configs
+# Step 2: Configure SELinux (allow NGINX to proxy to Docker containers)
+- name: Allow NGINX to connect to the network (SELinux)
+  ansible.posix.seboolean:
+    name: httpd_can_network_connect
+    state: true
+    persistent: true
+
+# Step 3: Deploy initial HTTP configs
 - name: Deploy Jenkins HTTP config (UAT only)
   ansible.builtin.template:
     src: jenkins-http.conf.j2
@@ -35,7 +42,7 @@
     mode: '0644'
   when: inventory_hostname in groups['prod']
 
-# Step 3: Ensure certbot is available before running TLS provisioning
+# Step 4: Ensure certbot is available before running TLS provisioning
 - name: Install certbot and certbot-nginx plugin
   ansible.builtin.package:
     name:
@@ -43,7 +50,7 @@
       - python3-certbot-nginx
     state: present
 
-# Step 4: Include certbot tasks (modularized in a separate file)
+# Step 5: Include certbot tasks (modularized in a separate file)
 - name: Include Certbot tasks
   ansible.builtin.include_tasks: certbot.yml
   tags: certbot

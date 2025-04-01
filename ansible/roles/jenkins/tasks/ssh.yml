@@ -29,7 +29,7 @@
     jenkins_ssh_pubkey.content is not defined
 
 - name: Install Jenkins public key on all target hosts
-  ansible.builtin.authorized_key:
+  ansible.posix.authorized_key:
     user: devops
     state: present
     key: "{{ jenkins_ssh_pubkey.content | b64decode }}"

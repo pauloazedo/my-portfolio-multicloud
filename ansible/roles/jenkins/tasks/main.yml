@@ -4,24 +4,19 @@
 # 1. Ensure Jenkins container is running
 - name: Ensure Jenkins container is running
   ansible.builtin.include_tasks: container.yml
-  # This will make sure the container is started before anything else is executed.
 
 # 2. Include SSH key setup for Jenkins agent access
 - name: Include SSH key setup for Jenkins agent access
   ansible.builtin.include_tasks: ssh.yml
 
-# 3. Include secrets retrieval from OCI Vault
-- name: Include secrets retrieval from OCI Vault
-  ansible.builtin.include_tasks: secrets.yml
-
-# 4. Include filesystem and Groovy init script preparation
+# 3. Include filesystem and Groovy init script preparation
 - name: Include filesystem and Groovy init script preparation
   ansible.builtin.include_tasks: prepare.yml
 
-# 5. Include plugins.txt rendering and hash calculation
+# 4. Include plugins.txt rendering and hash calculation
 - name: Include plugins.txt rendering and hash calculation
   ansible.builtin.include_tasks: plugins.yml
 
-# 6. Include final plugin installation and OCI SDK setup
+# 5. Include final plugin installation and OCI SDK setup
 - name: Include final plugin installation and OCI SDK setup
   ansible.builtin.include_tasks: finalize.yml
