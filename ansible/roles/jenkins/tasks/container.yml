@@ -1,14 +1,14 @@
 ---
 # Run and configure the Jenkins container
 
-# Step 1: Check if Jenkins container exists and get its status
+# Step 1: Check if Jenkins container exists
 - name: Check if Jenkins container exists
   community.docker.docker_container_info:
     name: jenkins
   register: jenkins_status
-  ignore_errors: true  # Avoid fatal failure if the container doesn't exist
+  ignore_errors: true
 
-# Step 2: Start Jenkins container if not already running
+# Step 2: Run Jenkins container if not already running
 - name: Start Jenkins container if not running
   community.docker.docker_container:
     name: jenkins
@@ -19,16 +19,17 @@
       - "8080:8080"
       - "50000:50000"
     volumes:
-      - /home/devops/jenkins_data:/var/jenkins_home
-      - /home/devops/jenkins_data/plugins.txt:/plugins.txt:ro
-      - /home/devops/jenkins_data/init.groovy.d:/usr/share/jenkins/ref/init.groovy.d:ro
+      - "{{ jenkins_data_dir }}:/var/jenkins_home"
+      - "{{ jenkins_plugins_txt }}:/usr/share/jenkins/ref/plugins.txt:ro"
+      - "{{ jenkins_init_dir }}:/usr/share/jenkins/ref/init.groovy.d:ro"
     env:
+      JAVA_OPTS: "-Djenkins.install.runSetupWizard=false"
       JENKINS_ADMIN_USER: "{{ jenkins_admin_user }}"
       JENKINS_ADMIN_PASS: "{{ jenkins_admin_pass }}"
       GITHUB_TOKEN: "{{ github_token }}"
     user: root
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:8080/login || exit 1"]
+      test: ["CMD-SHELL", "curl -fs http://localhost:8080/login || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 5
@@ -37,4 +38,3 @@
     jenkins_status.container is not defined
     or jenkins_status.container is none
     or jenkins_status.container.State.Status != 'running'
-

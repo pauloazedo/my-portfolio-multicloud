@@ -1,0 +1,26 @@
+# Render plugins.txt used by jenkins-plugin-cli
+- name: Render Jenkins plugins.txt
+  ansible.builtin.template:
+    src: plugins.txt.j2
+    dest: "{{ jenkins_plugins_txt }}"
+    owner: devops
+    group: devops
+    mode: '0644'
+
+# Ensure Jenkins init.groovy.d directory exists on host
+- name: Ensure Jenkins init directory exists
+  ansible.builtin.file:
+    path: "{{ jenkins_init_dir }}"
+    state: directory
+    owner: devops
+    group: devops
+    mode: '0755'
+
+# Copy admin Groovy script into Jenkins init directory
+- name: Copy Jenkins admin Groovy script
+  ansible.builtin.copy:
+    src: init.groovy.d/01-admin-user.groovy
+    dest: "{{ jenkins_init_dir }}/01-admin-user.groovy"
+    owner: devops
+    group: devops
+    mode: '0644'

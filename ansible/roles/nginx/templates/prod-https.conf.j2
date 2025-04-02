@@ -1,15 +1,15 @@
 server {
     listen 80;
-    server_name prod.pauloazedo.us;
+    server_name oci.prod.pauloazedo.dev;
     return 301 https://$host$request_uri;
 }
 
 server {
     listen 443 ssl;
-    server_name prod.pauloazedo.us;
+    server_name oci.prod.pauloazedo.dev;
 
-    ssl_certificate /etc/letsencrypt/live/prod.pauloazedo.us/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/prod.pauloazedo.us/privkey.pem;
+    ssl_certificate /etc/letsencrypt/live/oci.prod.pauloazedo.dev/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/oci.prod.pauloazedo.dev/privkey.pem;
 
     location / {
         proxy_pass http://localhost:3001;

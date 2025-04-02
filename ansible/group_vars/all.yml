@@ -8,6 +8,12 @@
 
 jenkins_http_port: 8080
 
+# Path to rendered plugins.txt on host (mounted into container)
+jenkins_plugins_txt: /home/devops/jenkins_data/plugins.txt
+
+# Path to init.groovy.d scripts on host (mounted into container)
+jenkins_init_dir: /home/devops/jenkins_data/init
+
 # List of Jenkins plugins to install
 jenkins_plugins:
   - workflow-aggregator
@@ -27,8 +33,8 @@ ocir_user: "idtijq8cx4jl/devops.user"
 # UAT Site Configuration
 ############################################################
 
-uat_site_image: "iad.ocir.io/{{ ocir_namespace ~ '/uat-site:latest' }}"
-uat_site_waiting_image: "iad.ocir.io/{{ ocir_namespace ~ '/uat-waiting:latest' }}"
+uat_site_image: "iad.ocir.io/{{ ocir_namespace }}/uat-site:latest"
+uat_site_waiting_image: "iad.ocir.io/{{ ocir_namespace }}/uat-waiting:latest"
 uat_site_container: "uat-site"
 uat_site_port: 3000
 

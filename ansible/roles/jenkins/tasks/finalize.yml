@@ -1,5 +1,10 @@
 ---
-# Final configuration steps for Jenkins once it's running
+# Final configuration steps for Jenkins
+
+# Optional: Wait a moment to allow init scripts to run
+- name: Pause briefly for Jenkins init script to apply
+  ansible.builtin.pause:
+    seconds: 10
 
 - name: Wait for Jenkins to become responsive
   ansible.builtin.uri:
@@ -10,11 +15,3 @@
   retries: 10
   delay: 15
   until: jenkins_status.status == 200
-
-# Example: Place for additional CLI init, seed jobs, etc.
-# - name: Run CLI-based initialization steps (if needed)
-#   ansible.builtin.command: >
-#     java -jar /var/jenkins_home/jenkins-cli.jar -s http://localhost:8080 ...
-#   environment:
-#     JENKINS_USER_ID: "{{ jenkins_admin_user }}"
-#     JENKINS_API_TOKEN: "{{ jenkins_admin_token }}"

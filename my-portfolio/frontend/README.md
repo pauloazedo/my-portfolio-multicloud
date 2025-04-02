@@ -3,7 +3,7 @@
 ![Next.js](https://img.shields.io/badge/Next.js-14-black?logo=next.js)
 ![Tailwind](https://img.shields.io/badge/TailwindCSS-4.0-blue?logo=tailwindcss)
 ![TypeScript](https://img.shields.io/badge/TypeScript-4.x-3178C6?logo=typescript)
-![Deployed](https://img.shields.io/website?down_color=red&down_message=offline&up_color=green&up_message=online&url=https://prod.pauloazedo.us)
+![Deployed](https://img.shields.io/website?down_color=red&down_message=offline&up_color=green&up_message=online&url=https://oci.prod.pauloazedo.dev)
 
 > ✨ This is the React frontend for `my-portfolio`, built as a dynamic, dark-themed, responsive single-page application (SPA) deployed to OCI using DevOps best practices.
 
@@ -11,8 +11,8 @@
 
 ## Demo
 
-🔗 [Visit Live Site (PROD)](https://prod.pauloazedo.us)  
-🔗 [Visit UAT](https://uat.pauloazedo.us)
+🔗 [Visit Live Site (PROD)](https://oci.prod.pauloazedo.dev)  
+🔗 [Visit UAT](https://oci.uat.pauloazedo.dev)
 
 ![Portfolio Screenshot](https://yourdomain.com/path-to-screenshot.jpg)
 

@@ -68,6 +68,7 @@
       timeout: 5s
       retries: 3
       start_period: 10s
+    recreate: true
     state: started
   when: uat_image_available | default(false)
 
@@ -93,7 +94,7 @@
 
 - name: Copy fallback HTML page to remote host
   ansible.builtin.copy:
-    src: files/index.html
+    src: files/uat-index.html
     dest: /home/devops/index.html
     owner: devops
     group: devops
@@ -105,6 +106,7 @@
     name: "uat-waiting"
     tag: "latest"
     source: build
+    force_source: true
     build:
       path: /home/devops
       dockerfile: uat-waiting.Dockerfile
@@ -137,8 +139,21 @@
     restart_policy: always
     published_ports:
       - "{{ uat_site_port }}:3000"
+    recreate: true
     state: started
   when: not uat_image_available | default(false)
+
+- name: Remove untagged or older fallback Docker images
+  ansible.builtin.shell: |
+    set -o pipefail
+    docker images --filter=reference='uat-waiting' --format '{{ '{{' }}.Repository{{ '}}' }}:{{ '{{' }}.Tag{{ '}}' }} {{ '{{' }}.ID{{ '}}' }}' |
+    grep -v 'uat-waiting:latest' | awk '{print $2}' | xargs -r docker rmi
+  args:
+    executable: /bin/bash
+  register: cleanup_result
+  changed_when: cleanup_result.stdout != ""
+  failed_when: false
+  when: uat_image_available is defined and not uat_image_available
 
 # Step 8: Cleanup temporary build files
 - name: Clean up temporary Dockerfile from remote host

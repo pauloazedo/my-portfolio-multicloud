@@ -32,16 +32,16 @@ output "vcn_id" {
 # === DNS RECORDS ===
 
 output "uat_dns_record" {
-  value       = "uat.pauloazedo.us"
+  value       = "oci.uat.pauloazedo.dev"
   description = "Public DNS record for UAT"
 }
 
 output "prod_dns_record" {
-  value       = "prod.pauloazedo.us"
+  value       = "oci.prod.pauloazedo.dev"
   description = "Public DNS record for Production"
 }
 
 output "jenkins_dns_record" {
-  value       = "jenkins.pauloazedo.us"
+  value       = "oci.jenkins.pauloazedo.dev"
   description = "Public DNS record for Jenkins (on UAT)"
 }

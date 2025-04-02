@@ -5,15 +5,15 @@
 - name: Define domains and templates per environment
   ansible.builtin.set_fact:
     nginx_certbot_domains:
-      - domain: "jenkins.pauloazedo.us"
+      - domain: "oci.jenkins.pauloazedo.dev"
         template: "jenkins-https.conf.j2"
         filename: "jenkins.conf"
         group: "uat"
-      - domain: "uat.pauloazedo.us"
+      - domain: "oci.uat.pauloazedo.dev"
         template: "uat-https.conf.j2"
         filename: "uat.conf"
         group: "uat"
-      - domain: "prod.pauloazedo.us"
+      - domain: "oci.prod.pauloazedo.dev"
         template: "prod-https.conf.j2"
         filename: "prod.conf"
         group: "prod"
@@ -55,7 +55,7 @@
     cmd: >
       certbot certonly --nginx -d {{ item.domain }}
       --non-interactive --agree-tos
-      -m pauloazedo@pauloazedo.us --redirect
+      -m paulo@pauloazedo.dev --redirect
   register: certbot_result
   changed_when: certbot_result.rc == 0
   failed_when: certbot_result.rc != 0

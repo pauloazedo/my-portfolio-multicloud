@@ -144,8 +144,8 @@ Planned additions:
 ## Portfolio Website
 
 - Fully described in [`my-portfolio/frontend/README.md`](my-portfolio/frontend/README.md)
-- Live UAT: `https://uat.pauloazedo.us`
-- Live PROD: `https://prod.pauloazedo.us`
+- Live UAT: `https://oci.uat.pauloazedo.dev`
+- Live PROD: `https://oci.prod.pauloazedo.dev`
 
 ---
 

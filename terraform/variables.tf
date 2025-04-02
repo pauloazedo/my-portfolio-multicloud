@@ -34,7 +34,7 @@ variable "cloudflare_api_token" {
 
 variable "cloudflare_zone_id" {
   type        = string
-  description = "Zone ID for the pauloazedo.us domain in Cloudflare"
+  description = "Zone ID for the oci.pauloazedo.dev domain in Cloudflare"
 }
 
 # === SSH KEY ===

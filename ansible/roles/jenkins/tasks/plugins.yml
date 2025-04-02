@@ -14,4 +14,3 @@
     state: started
     restart: true
   when: plugin_install_result.rc | default(1) == 0
-

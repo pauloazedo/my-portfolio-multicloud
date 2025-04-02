@@ -1,9 +1,9 @@
 server {
     listen 443 ssl;
-    server_name uat.pauloazedo.us;
+    server_name oci.uat.pauloazedo.dev;
 
-    ssl_certificate     /etc/letsencrypt/live/uat.pauloazedo.us/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/uat.pauloazedo.us/privkey.pem;
+    ssl_certificate     /etc/letsencrypt/live/oci.uat.pauloazedo.dev/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/oci.uat.pauloazedo.dev/privkey.pem;
     include             /etc/letsencrypt/options-ssl-nginx.conf;
     ssl_dhparam         /etc/letsencrypt/ssl-dhparams.pem;
 
@@ -18,6 +18,6 @@ server {
 
 server {
     listen 80;
-    server_name uat.pauloazedo.us;
+    server_name oci.uat.pauloazedo.dev;
     return 301 https://$host$request_uri;
 }

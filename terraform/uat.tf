@@ -22,10 +22,7 @@ resource "oci_core_instance" "uat" {
     hostname_label         = "uat-instance"
     assign_public_ip       = true
     skip_source_dest_check = false
-
-    nsg_ids = [
-      oci_core_network_security_group.nsg.id
-    ]
+    nsg_ids                = [oci_core_network_security_group.nsg.id]
   }
 
   shape_config {
@@ -33,9 +30,9 @@ resource "oci_core_instance" "uat" {
     memory_in_gbs = 12
   }
 
-defined_tags = {
-  "${data.oci_identity_tag_namespaces.devops.tag_namespaces[0].name}.${data.oci_identity_tags.access.tags[0].name}" = "vault"
-}
+  defined_tags = {
+    "${data.oci_identity_tag_namespaces.devops.tag_namespaces[0].name}.${data.oci_identity_tags.access.tags[0].name}" = "vault"
+  }
 
   metadata = {
     ssh_authorized_keys = file(var.ssh_public_key_path)
@@ -61,7 +58,7 @@ defined_tags = {
   depends_on = [data.oci_identity_tags.access]
 }
 
-# === VNIC and Public IP ===
+# === VNIC & Public IP Resolution ===
 data "oci_core_vnic_attachments" "uat" {
   compartment_id = oci_identity_compartment.devops_portfolio.id
   instance_id    = oci_core_instance.uat.id
@@ -72,25 +69,48 @@ data "oci_core_vnic" "uat" {
   depends_on = [oci_core_instance.uat]
 }
 
-# === CLOUDFLARE DNS ===
-resource "cloudflare_dns_record" "uat" {
+# === CLOUDFLARE DNS RECORDS ===
+resource "cloudflare_dns_record" "oci_uat" {
   zone_id = var.cloudflare_zone_id
-  name    = "uat"
+  name    = "oci.uat"
   type    = "A"
   content = oci_core_instance.uat.public_ip
   ttl     = 300
   proxied = false
-
   depends_on = [oci_core_instance.uat]
 }
 
-resource "cloudflare_dns_record" "jenkins" {
+resource "cloudflare_dns_record" "oci_jenkins" {
   zone_id = var.cloudflare_zone_id
-  name    = "jenkins"
+  name    = "oci.jenkins"
   type    = "A"
   content = oci_core_instance.uat.public_ip
   ttl     = 300
   proxied = false
-
   depends_on = [oci_core_instance.uat]
+}
+
+# === OCI CONTAINER REPOSITORIES (Root Compartment) ===
+resource "oci_artifacts_container_repository" "uat_waiting" {
+  compartment_id = var.tenancy_ocid
+  display_name   = "uat-waiting"
+  is_public      = false
+}
+
+resource "oci_artifacts_container_repository" "uat_site" {
+  compartment_id = var.tenancy_ocid
+  display_name   = "uat-site"
+  is_public      = false
+}
+
+resource "oci_artifacts_container_repository" "prod_waiting" {
+  compartment_id = var.tenancy_ocid
+  display_name   = "prod-waiting"
+  is_public      = false
+}
+
+resource "oci_artifacts_container_repository" "prod_site" {
+  compartment_id = var.tenancy_ocid
+  display_name   = "prod-site"
+  is_public      = false
 }
