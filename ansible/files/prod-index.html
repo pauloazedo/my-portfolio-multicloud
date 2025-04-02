@@ -1,0 +1,44 @@
+<!-- ansible/files/prod-index.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>PROD Site – Waiting</title>
+    <style>
+        body {
+            background-color: #0f172a;
+            color: #f1f5f9;
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+            text-align: center;
+        }
+        h1 {
+            font-size: 2.5rem;
+            margin-bottom: 1rem;
+        }
+        p {
+            font-size: 1.2rem;
+            max-width: 500px;
+            line-height: 1.5;
+            color: #94a3b8;
+        }
+        a.highlight {
+            color: #fbbf24;
+            font-weight: bold;
+            text-decoration: none;
+        }
+        a.highlight:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <h1>PROD Environment Ready</h1>
+    <p>Waiting for <a class="highlight" href="https://oci.jenkins.pauloazedo.dev" target="_blank" rel="noopener noreferrer">Jenkins</a> to promote and deploy the latest production release.</p>
+</body>
+</html>
