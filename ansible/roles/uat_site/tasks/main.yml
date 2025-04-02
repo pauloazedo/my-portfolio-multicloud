@@ -94,7 +94,7 @@
 
 - name: Copy fallback HTML page to remote host
   ansible.builtin.copy:
-    src: files/uat-index.html
+    src: files/uat-fallback-index.html
     dest: /home/devops/index.html
     owner: devops
     group: devops

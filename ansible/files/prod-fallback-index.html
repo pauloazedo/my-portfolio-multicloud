@@ -1,4 +1,4 @@
-<!-- ansible/files/prod-index.html -->
+<!-- ansible/files/index.template.html -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -38,7 +38,7 @@
     </style>
 </head>
 <body>
-    <h1>PROD Environment Ready</h1>
-    <p>Waiting for <a class="highlight" href="https://oci.jenkins.pauloazedo.dev" target="_blank" rel="noopener noreferrer">Jenkins</a> to promote and deploy the latest production release.</p>
+    <h1>PROD Environment Ready (<span>$FALLBACK_COLOR</span>)</h1>
+    <p>Waiting for <a class="highlight" href="https://oci.jenkins.pauloazedo.dev" target="_blank" rel="noopener noreferrer">Jenkins</a> to promote and deploy the latest <strong>$FALLBACK_COLOR</strong> release.</p>
 </body>
 </html>
