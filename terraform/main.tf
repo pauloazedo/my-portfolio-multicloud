@@ -148,3 +148,20 @@ resource "oci_core_network_security_group_security_rule" "allow_https" {
 
   description = "Allow HTTPS"
 }
+
+resource "oci_core_network_security_group_security_rule" "allow_jenkins" {
+  network_security_group_id = oci_core_network_security_group.nsg.id
+  direction                 = "INGRESS"
+  protocol                  = "6"
+  source_type               = "CIDR_BLOCK"
+  source                    = "0.0.0.0/0"
+
+  tcp_options {
+    destination_port_range {
+      min = 8080
+      max = 8080
+    }
+  }
+
+  description = "Allow Jenkins on 8080 Port"
+}

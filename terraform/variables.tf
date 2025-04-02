@@ -43,3 +43,16 @@ variable "ssh_public_key_path" {
   type        = string
   description = "Path to the public SSH key to inject into OCI instances"
 }
+
+# === JENKINS VOLUME ===
+
+variable "jenkins_volume_ocid" {
+  type        = string
+  description = "OCID of the pre-created OCI Block Volume used for Jenkins data"
+}
+
+variable "jenkins_volume_device" {
+  type        = string
+  default     = "/dev/oracleoci/oraclevdb"
+  description = "Linux device path to attach Jenkins block volume"
+}

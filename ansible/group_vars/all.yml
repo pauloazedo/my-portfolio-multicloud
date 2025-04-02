@@ -14,6 +14,9 @@ jenkins_plugins_txt: /home/devops/jenkins_data/plugins.txt
 # Path to init.groovy.d scripts on host (mounted into container)
 jenkins_init_dir: /home/devops/jenkins_data/init
 
+# Jenkins config dir
+jenkins_config_dir: /home/devops/jenkins_config
+
 # List of Jenkins plugins to install
 jenkins_plugins:
   - workflow-aggregator
@@ -21,6 +24,24 @@ jenkins_plugins:
   - blueocean
   - credentials
   - pipeline-utility-steps
+  - matrix-auth
+  - configuration-as-code
+  - github
+  - github-api
+  - github-branch-source
+  - folders
+  - matrix-project
+  - plain-credentials
+  - snakeyaml-api
+  - plugin-util-api
+  - caffeine-api
+  - okhttp-api
+  - joda-time-api
+  - commons-lang3-api
+  - asm-api
+  - pipeline-groovy
+  - pipeline-job
+  - pipeline-graph-analysis
 
 ############################################################
 # OCIR (Oracle Container Registry) Configuration

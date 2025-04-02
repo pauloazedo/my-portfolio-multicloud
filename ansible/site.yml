@@ -30,7 +30,14 @@
     - role: docker
     - role: nginx
 
-# Step 3: Configure Jenkins (UAT only)
+# Step 3: Mount Jenkins persistent block volume (UAT only)
+- name: Attach and mount Jenkins block volume
+  hosts: uat
+  become: true
+  roles:
+    - role: block_volume
+
+# Step 4: Configure Jenkins (UAT only)
 - name: Setup Jenkins (UAT only)
   hosts: uat
   become: true
@@ -38,10 +45,11 @@
     - group_vars/all.secrets.yml
   roles:
     - role: jenkins
+      tags: jenkins
   vars:
-    profile: DEVOPS  # Pass the profile variable here
+    profile: DEVOPS
 
-# Step 4: Deploy UAT site container
+# Step 5: Deploy UAT site container
 - name: Deploy UAT web container
   hosts: uat
   become: true
@@ -50,7 +58,7 @@
   roles:
     - role: uat_site
 
-# Step 5: Deploy PROD site container (Blue/Green)
+# Step 6: Deploy PROD site container (Blue/Green)
 - name: Deploy PROD web container
   hosts: prod
   become: true

@@ -17,11 +17,15 @@ resource "oci_core_instance" "prod" {
   shape               = "VM.Standard.A1.Flex"
 
   create_vnic_details {
-    subnet_id               = oci_core_subnet.prod_subnet.id
-    display_name            = "prod-vnic"
-    hostname_label   = "prod-instance"
-    assign_public_ip        = true
-    skip_source_dest_check  = false
+    subnet_id              = oci_core_subnet.prod_subnet.id
+    display_name           = "prod-vnic"
+    hostname_label         = "prod-instance"
+    assign_public_ip       = true
+    skip_source_dest_check = false
+
+    nsg_ids = [
+      oci_core_network_security_group.nsg.id
+    ]
   }
 
   shape_config {
@@ -66,9 +70,33 @@ data "oci_core_vnic" "prod" {
 }
 
 # === CLOUDFLARE DNS RECORD FOR PROD ===
-resource "cloudflare_dns_record" "prod" {
+resource "cloudflare_dns_record" "oci_prod" {
   zone_id = var.cloudflare_zone_id
-  name    = "prod"
+  name    = "oci.prod"
+  type    = "A"
+  content = oci_core_instance.prod.public_ip
+  ttl     = 300
+  proxied = false
+
+  depends_on = [oci_core_instance.prod]
+}
+
+# === CLOUDFLARE DNS RECORD FOR ROOT DOMAIN ===
+resource "cloudflare_dns_record" "root" {
+  zone_id = var.cloudflare_zone_id
+  name    = "@"
+  type    = "A"
+  content = oci_core_instance.prod.public_ip
+  ttl     = 300
+  proxied = false
+
+  depends_on = [oci_core_instance.prod]
+}
+
+# === CLOUDFLARE DNS RECORD FOR WWW SUBDOMAIN ===
+resource "cloudflare_dns_record" "www" {
+  zone_id = var.cloudflare_zone_id
+  name    = "www"
   type    = "A"
   content = oci_core_instance.prod.public_ip
   ttl     = 300

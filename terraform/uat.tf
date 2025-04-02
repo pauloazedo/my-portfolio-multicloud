@@ -58,6 +58,15 @@ resource "oci_core_instance" "uat" {
   depends_on = [data.oci_identity_tags.access]
 }
 
+# === Attach Jenkins Block Volume ===
+resource "oci_core_volume_attachment" "jenkins_data" {
+  instance_id      = oci_core_instance.uat.id
+  volume_id        = var.jenkins_volume_ocid
+  attachment_type  = "paravirtualized"
+  device           = var.jenkins_volume_device
+  display_name     = "jenkins-volume-attachment"
+}
+
 # === VNIC & Public IP Resolution ===
 data "oci_core_vnic_attachments" "uat" {
   compartment_id = oci_identity_compartment.devops_portfolio.id

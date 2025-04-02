@@ -1,0 +1,4 @@
+---
+block_volume_device: /dev/sdb
+block_volume_mount_point: /home/devops/jenkins_data
+block_volume_filesystem_type: ext4

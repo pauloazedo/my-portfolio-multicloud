@@ -1,22 +1,10 @@
 ---
 # Main Jenkins role task entrypoint
 
-# 1. Include filesystem and Groovy init script preparation (creates plugin file and init dirs)
-- name: Include filesystem and Groovy init script preparation
+- name: Prepare Jenkins data directory
   ansible.builtin.include_tasks: prepare.yml
+  tags: jenkins
 
-# 2. Ensure Jenkins container is running
-- name: Ensure Jenkins container is running
+- name: Run Jenkins container with persistent data
   ansible.builtin.include_tasks: container.yml
-
-# 3. Include SSH key setup for Jenkins agent access
-- name: Include SSH key setup for Jenkins agent access
-  ansible.builtin.include_tasks: ssh.yml
-
-# 4. Include plugins.txt processing (install via jenkins-plugin-cli)
-- name: Include plugins.txt rendering and hash calculation
-  ansible.builtin.include_tasks: plugins.yml
-
-# 5. Final setup: validate Jenkins is up, install tools inside container
-- name: Include final plugin installation and OCI SDK setup
-  ansible.builtin.include_tasks: finalize.yml
+  tags: jenkins

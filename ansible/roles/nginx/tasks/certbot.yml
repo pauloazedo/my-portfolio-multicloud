@@ -18,14 +18,13 @@
         filename: "prod.conf"
         group: "prod"
 
-# Step 2:Extract domains relevant to this host (based on group membership)
+# Step 2: Extract domains relevant to this host (based on group membership)
 - name: Extract domains for this host only
   ansible.builtin.set_fact:
     certbot_domains_for_host: >-
       {{
         nginx_certbot_domains
         | selectattr('group', 'in', group_names)
-        | map(attribute='domain')
         | list
       }}
 
@@ -34,13 +33,13 @@
   ansible.builtin.set_fact:
     certbot_paths_to_cleanup: >-
       {{
-        (certbot_domains_for_host | map('regex_replace', '^(.*)$', 'live/\\1') | list)
-        + (certbot_domains_for_host | map('regex_replace', '^(.*)$', 'archive/\\1') | list)
-        + (certbot_domains_for_host | map('regex_replace', '^(.*)$', 'renewal/\\1.conf') | list)
+        (certbot_domains_for_host | map(attribute='domain') | map('regex_replace', '^(.*)$', 'live/\\1') | list)
+        + (certbot_domains_for_host | map(attribute='domain') | map('regex_replace', '^(.*)$', 'archive/\\1') | list)
+        + (certbot_domains_for_host | map(attribute='domain') | map('regex_replace', '^(.*)$', 'renewal/\\1.conf') | list)
       }}
   when: certbot_force_clean | default(false) | bool
 
-# Step 4: Remove previous Certbot state from filesystem
+# Step 4: Remove previous Certbot state from filesystem (optional)
 - name: Clean up previous Certbot state (optional safety for retrying)
   ansible.builtin.file:
     path: "/etc/letsencrypt/{{ item }}"
@@ -49,28 +48,27 @@
   when: certbot_force_clean | default(false) | bool
   tags: certbot
 
-# Step 5: Generate HTTPS certificates using Certbot for each domain (on matching hosts)
+# Step 5: Generate HTTPS certificates using Certbot (only if not already present)
 - name: Generate HTTPS certs with Certbot
   ansible.builtin.command:
     cmd: >
       certbot certonly --nginx -d {{ item.domain }}
       --non-interactive --agree-tos
       -m paulo@pauloazedo.dev --redirect
+    creates: "/etc/letsencrypt/live/{{ item.domain }}/fullchain.pem"
   register: certbot_result
   changed_when: certbot_result.rc == 0
   failed_when: certbot_result.rc != 0
-  loop: "{{ nginx_certbot_domains }}"
-  when: inventory_hostname in groups[item.group]
+  loop: "{{ certbot_domains_for_host }}"
   tags: certbot
 
-# Step 6: Replace HTTP config with HTTPS config (for domains on this host)
+# Step 6: Replace NGINX HTTP config with HTTPS config
 - name: Replace NGINX config with HTTPS version
   ansible.builtin.template:
     src: "{{ item.template }}"
     dest: "/etc/nginx/conf.d/{{ item.filename }}"
     mode: '0644'
-  loop: "{{ nginx_certbot_domains }}"
-  when: inventory_hostname in groups[item.group]
+  loop: "{{ certbot_domains_for_host }}"
   tags: certbot
 
 # Step 7: Reload NGINX to apply new HTTPS config
