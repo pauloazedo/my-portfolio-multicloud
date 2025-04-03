@@ -2,9 +2,10 @@ pipeline {
   agent any
 
   environment {
-    ANSIBLE_INVENTORY = "ansible/inventory/hosts"
-    OCIR_REPO = "iad.ocir.io/idtijq8cx4jl/uat-site"
-    IMAGE_TAG = ""
+    ANSIBLE_INVENTORY = 'ansible/inventory/hosts'
+    OCIR_REPO         = 'iad.ocir.io/idtijq8cx4jl/uat-site'
+    IMAGE_TAG         = ''
+    ANSIBLE_BIN       = '/home/jenkins/venv/bin/ansible-playbook'
   }
 
   options {
@@ -28,8 +29,10 @@ pipeline {
     stage('Set Image Tag') {
       steps {
         script {
-          IMAGE_TAG = sh(script: "git rev-parse --short HEAD", returnStdout: true).trim()
-          env.IMAGE_TAG = IMAGE_TAG
+          env.IMAGE_TAG = sh(
+            script: 'git rev-parse --short HEAD',
+            returnStdout: true
+          ).trim()
         }
       }
     }
@@ -38,20 +41,21 @@ pipeline {
       steps {
         sh '''
           rsync -az --delete -e "ssh -i /var/jenkins_home/.ssh/id_rsa \
-          -o StrictHostKeyChecking=accept-new" ./my-portfolio/frontend/ \
-          devops@oci.uat.pauloazedo.dev:/home/devops/frontend
+            -o StrictHostKeyChecking=accept-new" \
+            ./my-portfolio/frontend/ \
+            devops@oci.uat.pauloazedo.dev:/home/devops/frontend
         '''
       }
     }
 
     stage('Trigger Ansible Deployment') {
       steps {
-        sh """
-          ansible-playbook -i ${ANSIBLE_INVENTORY} ansible/site.yml \
+        sh '''
+          ${ANSIBLE_BIN} -i ${ANSIBLE_INVENTORY} ansible/site.yml \
             --limit uat \
             --extra-vars "uat_site_custom_image=${OCIR_REPO}:${IMAGE_TAG} \
                           uat_site_image_tag=${IMAGE_TAG}"
-        """
+        '''
       }
     }
   }
