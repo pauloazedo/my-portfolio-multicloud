@@ -12,3 +12,11 @@
 - name: Install tools inside Jenkins container
   ansible.builtin.include_tasks: tools.yml
   tags: jenkins
+
+- name: Setup SSH access for Jenkins
+  ansible.builtin.include_tasks: ssh.yml
+  tags: ssh
+
+- name: Set up SSH access for Jenkins to deploy targets
+  ansible.builtin.include_tasks: ssh.yml
+  tags: jenkins

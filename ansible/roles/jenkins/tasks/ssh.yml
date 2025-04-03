@@ -1,0 +1,44 @@
+---
+# SSH keypair generation and access setup for Jenkins
+
+- name: Ensure Jenkins .ssh directory exists with correct permissions
+  ansible.builtin.file:
+    path: "{{ jenkins_data_dir }}/.ssh"
+    state: directory
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: '0700'
+
+- name: Generate SSH keypair for Jenkins if not present
+  community.crypto.openssh_keypair:
+    path: "{{ jenkins_data_dir }}/.ssh/id_rsa"
+    type: rsa
+    size: 4096
+    mode: '0600'
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    regenerate: never  # don't overwrite existing keys
+
+- name: Set proper permissions on public key
+  ansible.builtin.file:
+    path: "{{ jenkins_data_dir }}/.ssh/id_rsa.pub"
+    mode: '0644'
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+
+- name: Add Jenkins public key to UAT server authorized_keys
+  ansible.posix.authorized_key:
+    user: "{{ ansible_user }}"
+    state: present
+    key: "{{ lookup('file', jenkins_data_dir + '/.ssh/id_rsa.pub') }}"
+    manage_dir: true
+
+- name: Pre-approve UAT host key for Jenkins known_hosts file
+  ansible.builtin.known_hosts:
+    name: "oci.uat.pauloazedo.dev"
+    key: "{{ lookup('pipe', 'ssh-keyscan -H oci.uat.pauloazedo.dev') }}"
+    path: "{{ jenkins_data_dir }}/.ssh/known_hosts"
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: '0644'
+    state: present

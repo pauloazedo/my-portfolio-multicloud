@@ -1,0 +1,6 @@
+{
+  "ansible.python.interpreterPath": "/Users/pauloazedo/.pyenv/versions/3.13.2/bin/python",
+  "ansible.ansible.path": "/Users/pauloazedo/.pyenv/shims/ansible",
+  "ansible.ansibleLint.path": "/Users/pauloazedo/.pyenv/shims/ansible-lint",
+  "ansible.useFullyQualifiedCollectionNames": true
+}
