@@ -17,7 +17,7 @@
       docker login iad.ocir.io
       -u {{ ocir_user }}
       -p {{ ocir_token }}
-  when: docker_info_check.stdout is not search('Username: {{ ocir_user }}')
+  when: "'Username: ' ~ ocir_user not in docker_info_check.stdout"
   no_log: true
   changed_when: false
 
@@ -27,16 +27,15 @@
     state: absent
     force_kill: true
 
-- name: Force pull UAT site image from OCI
+- name: Try to pull UAT site image from OCI
   community.docker.docker_image:
     name: "{{ uat_site_image }}"
     source: pull
-    force_source: true
   register: uat_image_pull
   failed_when: false
   ignore_errors: true
 
-- name: Check if UAT image exists locally (tag verification)
+- name: Check if UAT image exists locally (fallback check)
   community.docker.docker_image_info:
     name: "{{ uat_site_image }}"
   register: uat_local_image_info
@@ -49,15 +48,7 @@
       {{ ('Image is up to date' in (uat_image_pull.msg | default('')))
          or ('Downloaded newer image' in (uat_image_pull.msg | default('')))
          or (uat_image_pull.changed | default(false))
-         or (
-           uat_local_image_info.images is defined
-           and uat_local_image_info.images
-           | selectattr('RepoTags', 'defined')
-           | selectattr('RepoTags', 'contains', uat_site_image)
-           | list
-           | length > 0
-         )
-      }}
+         or (uat_local_image_info.images | length > 0) }}
 
 - name: Show pull result
   ansible.builtin.debug:
@@ -66,17 +57,6 @@
 - name: Show UAT image availability flag
   ansible.builtin.debug:
     var: uat_image_available
-
-- name: Show matching images (for verification)
-  ansible.builtin.debug:
-    msg: >-
-      {{
-        uat_local_image_info.images
-        | selectattr('RepoTags', 'defined')
-        | selectattr('RepoTags', 'contains', uat_site_image)
-        | list
-      }}
-  when: uat_local_image_info.images is defined
 
 - name: Include task to run real app if image is available
   ansible.builtin.import_tasks: run-real.yml
