@@ -1,5 +1,0 @@
-fail2ban_default_settings:
-  bantime: 3600         # Ban IP for 1 hour
-  findtime: 300         # Look at 5-minute intervals
-  maxretry: 3           # Ban after 3 failures
-  ignoreip: 127.0.0.1/8 ::1
