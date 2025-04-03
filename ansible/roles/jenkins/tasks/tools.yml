@@ -1,13 +1,13 @@
 ---
 # Install Python, Ansible, OCI SDK, Node.js and npm inside Jenkins container
 
-- name: Install Python, pip, Ansible, OCI SDK, Node.js and npm inside Jenkins container
+- name: Install Python, pip, Ansible, OCI SDK, Node.js, npm, and rsync inside Jenkins container
   community.docker.docker_container_exec:
     container: jenkins
     command: >
       bash -c "
         apt-get update &&
-        apt-get install -y python3-venv python3-pip curl gnupg &&
+        apt-get install -y python3-venv python3-pip rsync curl gnupg &&
         curl -fsSL https://deb.nodesource.com/setup_20.x | bash - &&
         apt-get install -y nodejs &&
         python3 -m venv /home/jenkins/venv &&
