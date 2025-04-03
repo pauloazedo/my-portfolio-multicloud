@@ -2,10 +2,13 @@ pipeline {
   agent any
 
   environment {
-    ANSIBLE_INVENTORY = 'ansible/inventory/hosts'
-    OCIR_REPO         = 'iad.ocir.io/idtijq8cx4jl/uat-site'
-    IMAGE_TAG         = ''
-    ANSIBLE_BIN       = '/home/jenkins/venv/bin/ansible-playbook'
+    ANSIBLE_BIN = "/home/jenkins/venv/bin/ansible-playbook"
+    ANSIBLE_INVENTORY = "ansible/inventory/hosts"
+    OCIR_REPO = "iad.ocir.io/idtijq8cx4jl/uat-site"
+    IMAGE_TAG = ""
+    SSH_KEY = "/var/jenkins_home/.ssh/id_rsa"
+    SSH_USER = "devops"
+    SSH_HOST = "oci.uat.pauloazedo.dev"
   }
 
   options {
@@ -18,7 +21,6 @@ pipeline {
   }
 
   stages {
-
     stage('Checkout') {
       steps {
         git branch: 'uat',
@@ -29,10 +31,8 @@ pipeline {
     stage('Set Image Tag') {
       steps {
         script {
-          env.IMAGE_TAG = sh(
-            script: 'git rev-parse --short HEAD',
-            returnStdout: true
-          ).trim()
+          def tag = sh(script: "git rev-parse --short HEAD", returnStdout: true).trim()
+          env.IMAGE_TAG = tag
         }
       }
     }
@@ -40,10 +40,10 @@ pipeline {
     stage('Sync frontend code to UAT server') {
       steps {
         sh '''
-          rsync -az --delete -e "ssh -i /var/jenkins_home/.ssh/id_rsa \
-            -o StrictHostKeyChecking=accept-new" \
+          rsync -az --delete \
+            -e "ssh -i ${SSH_KEY} -o StrictHostKeyChecking=accept-new" \
             ./my-portfolio/frontend/ \
-            devops@oci.uat.pauloazedo.dev:/home/devops/frontend
+            ${SSH_USER}@${SSH_HOST}:/home/devops/frontend
         '''
       }
     }
@@ -51,6 +51,8 @@ pipeline {
     stage('Trigger Ansible Deployment') {
       steps {
         sh '''
+          export ANSIBLE_SSH_ARGS="-i ${SSH_KEY} -o StrictHostKeyChecking=accept-new"
+          export ANSIBLE_REMOTE_USER=${SSH_USER}
           ${ANSIBLE_BIN} -i ${ANSIBLE_INVENTORY} ansible/site.yml \
             --limit uat \
             --extra-vars "uat_site_custom_image=${OCIR_REPO}:${IMAGE_TAG} \
