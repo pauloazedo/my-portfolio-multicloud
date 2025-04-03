@@ -1,0 +1,41 @@
+# tasks/main.yml
+# Role: cloud_volume_oci
+# Purpose: Format and mount a pre-attached OCI block volume for persistent Jenkins data
+
+- name: Ensure mount point directory exists
+  # Creates the directory where the block volume will be mounted (e.g., /home/devops/jenkins_data)
+  ansible.builtin.file:
+    path: "{{ cloud_volume_mount_point }}"
+    state: directory
+    owner: devops
+    group: devops
+    mode: '0755'
+
+- name: Check if block device is already formatted
+  # Uses lsblk to check if the block device already has a filesystem (FSTYPE column)
+  ansible.builtin.command: lsblk -f {{ cloud_volume_device }} --output FSTYPE -n
+  register: fs_check
+  changed_when: false
+
+- name: Format block device with ext4 if not already formatted
+  # Formats the device with ext4 if no filesystem is found
+  ansible.builtin.command: mkfs.ext4 {{ cloud_volume_device }}
+  when: fs_check.stdout == ""
+  changed_when: fs_check.stdout == ""
+
+- name: Mount the block device
+  # Mounts the block volume at the defined mount point using the specified filesystem type
+  ansible.posix.mount:
+    path: "{{ cloud_volume_mount_point }}"
+    src: "{{ cloud_volume_device }}"
+    fstype: "{{ cloud_volume_filesystem_type }}"
+    state: mounted
+
+- name: Ensure block device is added to /etc/fstab
+  # Ensures mount persists on reboot by adding it to /etc/fstab
+  ansible.posix.mount:
+    path: "{{ cloud_volume_mount_point }}"
+    src: "{{ cloud_volume_device }}"
+    fstype: "{{ cloud_volume_filesystem_type }}"
+    opts: defaults
+    state: present

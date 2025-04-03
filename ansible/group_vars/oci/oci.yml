@@ -1,0 +1,48 @@
+# ansible/group_vars/oci.yml
+# OCI-specific variables and role mappings
+
+############################################################
+# Cloud Provider Identity
+############################################################
+cloud_provider: "oci"
+
+############################################################
+# OCI Registry Namespace
+############################################################
+ocir_namespace: "idtijq8cx4jl"
+
+############################################################
+# Dynamic Role Paths (for OS-sensitive logic)
+# These allow uat.yml/prod.yml to use provider-specific roles
+############################################################
+bootstrap_role: "cloud/oci/bootstrap"
+common_role: "cloud/oci/common"
+docker_role: "cloud/oci/docker"
+hardening_role: "cloud/oci/hardening"
+ssh_access_role: "cloud/oci/ssh_access"
+jenkins_volume_role: "cloud/oci/jenkins_volume"
+
+############################################################
+# UAT Site Configuration
+############################################################
+uat_site_image: "iad.ocir.io/{{ ocir_namespace }}/uat-site:latest"
+uat_site_waiting_image: "iad.ocir.io/{{ ocir_namespace }}/uat-waiting:latest"
+uat_site_container: "uat-site"
+uat_site_port: 3000
+uat_site_git_repo: "https://github.com/pauloazedo/my-portfolio-oci-devops.git"
+uat_site_git_branch: "uat"
+uat_site_dockerfile_path: "my-portfolio/frontend"
+uat_site_image_tag: "{{ lookup('pipe', 'git rev-parse --short HEAD') }}"
+
+############################################################
+# PROD Site Configuration (Blue/Green Deployment)
+############################################################
+prod_site_green_image: "iad.ocir.io/{{ ocir_namespace }}/prod-site:green"
+prod_site_green_container: "prod-site-green"
+prod_site_green_port: 3100
+
+prod_site_blue_image: "iad.ocir.io/{{ ocir_namespace }}/prod-site:blue"
+prod_site_blue_container: "prod-site-blue"
+prod_site_blue_port: 3200
+
+prod_site_waiting_image: "iad.ocir.io/{{ ocir_namespace }}/prod-waiting:latest"

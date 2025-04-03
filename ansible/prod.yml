@@ -1,21 +1,55 @@
 ---
+# PROD Infrastructure and Application Deployment (Blue/Green)
+
+# Step 1: Setup base infrastructure (PROD)
 - name: Setup base infrastructure (PROD)
   hosts: prod
   become: true
   vars_files:
+    - group_vars/all.yml
     - group_vars/all.secrets.yml
-  roles:
-    - { role: bootstrap, tags: bootstrap }
-    - { role: common, tags: common }
-    - { role: hardening, tags: hardening }
-    - { role: docker, tags: docker }
-    - { role: nginx, tags: nginx }
-    - { role: ssh_access, tags: ssh_access }
+    - group_vars/{{ cloud_provider }}/{{ cloud_provider }}.yml
+    - group_vars/{{ cloud_provider }}/{{ cloud_provider }}.secrets.yml
+  tasks:
+    - name: Include bootstrap role
+      ansible.builtin.include_role:
+        name: "{{ bootstrap_role }}"
+      tags: bootstrap
 
+    - name: Include common role
+      ansible.builtin.include_role:
+        name: "{{ common_role }}"
+      tags: common
+
+    - name: Include hardening role
+      ansible.builtin.include_role:
+        name: "{{ hardening_role }}"
+      tags: hardening
+
+    - name: Include docker role
+      ansible.builtin.include_role:
+        name: "{{ docker_role }}"
+      tags: docker
+
+    - name: Include nginx role
+      ansible.builtin.include_role:
+        name: "nginx"
+      tags: nginx
+
+    - name: Include SSH access role
+      ansible.builtin.include_role:
+        name: "{{ ssh_access_role }}"
+      tags: set_ssh_access
+
+# Step 2: Deploy PROD web container (Blue/Green)
 - name: Deploy PROD web container (Blue/Green)
   hosts: prod
   become: true
   vars_files:
+    - group_vars/all.yml
     - group_vars/all.secrets.yml
+    - group_vars/{{ cloud_provider }}/{{ cloud_provider }}.yml
+    - group_vars/{{ cloud_provider }}/{{ cloud_provider }}.secrets.yml
   roles:
-    - { role: prod_site, tags: prod }
+    - role: prod_site
+      tags: prod_site
