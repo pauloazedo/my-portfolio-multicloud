@@ -1,4 +1,3 @@
-<!-- ansible/files/index.template.html -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -35,10 +34,17 @@
         a.highlight:hover {
             text-decoration: underline;
         }
+        .color-label {
+            font-weight: 900;
+            font-size: 1.3rem;
+        }
     </style>
 </head>
 <body>
-    <h1>PROD Environment Ready (<span>$FALLBACK_COLOR</span>)</h1>
-    <p>Waiting for <a class="highlight" href="https://oci.jenkins.pauloazedo.dev" target="_blank" rel="noopener noreferrer">Jenkins</a> to promote and deploy the latest <strong>$FALLBACK_COLOR</strong> release.</p>
+    <h1>PROD Environment Ready (<span class="color-label" style="color: $FALLBACK_COLOR;">$FALLBACK_COLOR</span>)</h1>
+    <p>Waiting for <a class="highlight" href="https://oci.jenkins.pauloazedo.dev" target="_blank" rel="noopener noreferrer">Jenkins</a>
+       to promote and deploy the latest
+       <span class="color-label" style="color: $FALLBACK_COLOR;">$FALLBACK_COLOR</span> release.
+    </p>
 </body>
 </html>

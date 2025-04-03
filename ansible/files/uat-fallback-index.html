@@ -1,4 +1,4 @@
-<!-- ansible/files/uat-index.html -->
+<!-- ansible/files/uat-fallback-index.template.html -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -38,7 +38,7 @@
     </style>
 </head>
 <body>
-    <h1>UAT Environment Ready</h1>
-    <p>Waiting for <a class="highlight" href="https://oci.jenkins.pauloazedo.dev" target="_blank" rel="noopener noreferrer">Jenkins</a> to publish the latest image through the pipeline.</p>
+    <h1>UAT Environment Ready (<span>$FALLBACK_COLOR</span>)</h1>
+    <p>Waiting for <a class="highlight" href="https://oci.jenkins.pauloazedo.dev" target="_blank" rel="noopener noreferrer">Jenkins</a> to publish the latest <strong>$FALLBACK_COLOR</strong> image through the pipeline.</p>
 </body>
 </html>

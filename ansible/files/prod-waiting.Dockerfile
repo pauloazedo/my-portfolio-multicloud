@@ -2,10 +2,13 @@
 
 FROM nginx:alpine
 
-# Use shared fallback config
+# Use shared fallback NGINX config
 COPY default-waiting.conf /etc/nginx/conf.d/default.conf
 
-# Copy fallback index HTML
-COPY prod-fallback-index.html /usr/share/nginx/html/index.html
+# Copy UAT fallback HTML template using $FALLBACK_COLOR
+COPY prod-fallback-index.html /usr/share/nginx/html/index.template.html
+
+# Generate index.html dynamically using environment variable
+CMD ["/bin/sh", "-c", "envsubst < /usr/share/nginx/html/index.template.html > /usr/share/nginx/html/index.html && nginx -g 'daemon off;'"]
 
 EXPOSE 3000

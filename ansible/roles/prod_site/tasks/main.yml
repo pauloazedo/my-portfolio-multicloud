@@ -7,7 +7,7 @@
     name: docker
   tags: always
 
-# Step 2: Authenticate to OCIR (if not already logged in)
+# Step 2: Authenticate to OCIR
 - name: Check if already logged into OCIR
   ansible.builtin.command: docker info
   register: docker_info_check
@@ -24,41 +24,13 @@
   no_log: true
   changed_when: false
 
-# Step 3: Try pulling green and blue images from OCIR
-- name: Try to pull green image
-  community.docker.docker_image:
-    name: "{{ prod_site_green_image }}"
-    source: pull
-  register: green_image_check
-  failed_when: false
-  ignore_errors: true
+# Steps 3 and 4 on check_images.yml
+- name: Include image pull and flag check
+  ansible.builtin.include_tasks: check_images.yml
+  tags: fallback
 
-- name: Try to pull blue image
-  community.docker.docker_image:
-    name: "{{ prod_site_blue_image }}"
-    source: pull
-  register: blue_image_check
-  failed_when: false
-  ignore_errors: true
-
-# Step 4: Set image availability flags
-- name: Set image availability flags
-  ansible.builtin.set_fact:
-    green_image_available: >-
-      {{ ('Image is up to date' in green_image_check.msg)
-         or ('Downloaded newer image' in green_image_check.msg) }}
-    blue_image_available: >-
-      {{ ('Image is up to date' in blue_image_check.msg)
-         or ('Downloaded newer image' in blue_image_check.msg) }}
-
-- name: Show green/blue image availability
-  ansible.builtin.debug:
-    msg: >
-      Green: {{ green_image_available | default(false) }},
-      Blue: {{ blue_image_available | default(false) }}
-
-# Step 5: Fallback - build, tag, push waiting container if needed
-- name: Copy fallback Dockerfile to remote host
+# Step 5: Build and push fallback image (if both fail)
+- name: Copy fallback Dockerfile
   ansible.builtin.copy:
     src: files/prod-waiting.Dockerfile
     dest: /home/devops/prod-waiting.Dockerfile
@@ -66,8 +38,9 @@
     group: devops
     mode: '0644'
   when: not green_image_available and not blue_image_available
+  tags: fallback
 
-- name: Copy fallback NGINX config to remote host
+- name: Copy shared fallback NGINX config
   ansible.builtin.copy:
     src: files/default-waiting.conf
     dest: /home/devops/default-waiting.conf
@@ -75,8 +48,9 @@
     group: devops
     mode: '0644'
   when: not green_image_available and not blue_image_available
+  tags: fallback
 
-- name: Copy fallback HTML to remote host
+- name: Copy fallback HTML template
   ansible.builtin.copy:
     src: files/prod-fallback-index.html
     dest: /home/devops/index.html
@@ -84,6 +58,17 @@
     group: devops
     mode: '0644'
   when: not green_image_available and not blue_image_available
+  tags: fallback
+
+- name: Copy fallback HTML file to expected Dockerfile path
+  ansible.builtin.copy:
+    src: files/prod-fallback-index.html
+    dest: /home/devops/prod-fallback-index.html
+    owner: devops
+    group: devops
+    mode: '0644'
+  when: not green_image_available and not blue_image_available
+  tags: fallback
 
 - name: Build fallback PROD image
   community.docker.docker_image:
@@ -99,37 +84,36 @@
         org.opencontainers.image.description: "Fallback PROD site - waiting for Jenkins"
         org.opencontainers.image.source: "ansible"
   when: not green_image_available and not blue_image_available
+  tags: fallback
 
-- name: Tag fallback image for OCIR
+- name: Tag fallback image
   ansible.builtin.command:
-    cmd: >
-      docker tag prod-waiting:latest {{ prod_site_waiting_image }}
+    cmd: docker tag prod-waiting:latest {{ prod_site_waiting_image }}
   when: not green_image_available and not blue_image_available
   changed_when: true
-  check_mode: false
+  tags: fallback
 
-- name: Push fallback image to OCIR
+- name: Push fallback image
   ansible.builtin.command:
-    cmd: >
-      docker push {{ prod_site_waiting_image }}
+    cmd: docker push {{ prod_site_waiting_image }}
   when: not green_image_available and not blue_image_available
   changed_when: true
-  check_mode: false
+  tags: fallback
 
-# Step 6: Stop and remove existing containers
-- name: Stop and remove green container
+# Step 6: Remove existing containers
+- name: Remove green container
   community.docker.docker_container:
     name: "{{ prod_site_green_container }}"
     state: absent
     force_kill: true
 
-- name: Stop and remove blue container
+- name: Remove blue container
   community.docker.docker_container:
     name: "{{ prod_site_blue_container }}"
     state: absent
     force_kill: true
 
-# Step 7: Run green container
+# Step 7: Run green container (real or fallback)
 - name: Start green container with real image
   community.docker.docker_container:
     name: "{{ prod_site_green_container }}"
@@ -150,9 +134,12 @@
       - "{{ prod_site_green_port }}:3000"
     recreate: true
     state: started
+    env:
+      FALLBACK_COLOR: green
   when: not green_image_available | default(false)
+  tags: fallback
 
-# Step 8: Run blue container
+# Step 8: Run blue container (real or fallback)
 - name: Start blue container with real image
   community.docker.docker_container:
     name: "{{ prod_site_blue_container }}"
@@ -173,10 +160,13 @@
       - "{{ prod_site_blue_port }}:3000"
     recreate: true
     state: started
+    env:
+      FALLBACK_COLOR: blue
   when: not blue_image_available | default(false)
+  tags: fallback
 
-# Step 9: Remove older fallback images
-- name: Remove untagged or older fallback Docker images
+# Step 9: Cleanup fallback images
+- name: Remove older fallback Docker images
   ansible.builtin.shell: |
     set -o pipefail
     docker images --filter=reference='prod-waiting' --format '{{ '{{' }}.Repository{{ '}}' }}:{{ '{{' }}.Tag{{ '}}' }} {{ '{{' }}.ID{{ '}}' }}' |
@@ -187,6 +177,7 @@
   changed_when: cleanup_result.stdout != ""
   failed_when: false
   when: not green_image_available and not blue_image_available
+  tags: fallback
 
 # Step 10: Clean up build files
 - name: Remove prod-waiting.Dockerfile
@@ -194,15 +185,18 @@
     path: /home/devops/prod-waiting.Dockerfile
     state: absent
   when: not green_image_available and not blue_image_available
+  tags: fallback
 
 - name: Remove default-waiting.conf
   ansible.builtin.file:
     path: /home/devops/default-waiting.conf
     state: absent
   when: not green_image_available and not blue_image_available
+  tags: fallback
 
-- name: Remove prod-fallback-index.html
+- name: Remove index.template.html
   ansible.builtin.file:
-    path: /home/devops/index.html
+    path: /home/devops/index.template.html
     state: absent
   when: not green_image_available and not blue_image_available
+  tags: fallback

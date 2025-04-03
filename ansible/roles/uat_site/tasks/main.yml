@@ -95,11 +95,10 @@
 - name: Copy fallback HTML page to remote host
   ansible.builtin.copy:
     src: files/uat-fallback-index.html
-    dest: /home/devops/index.html
+    dest: /home/devops/uat-fallback-index.html
     owner: devops
     group: devops
     mode: '0644'
-  when: not uat_image_available | default(false)
 
 - name: Build fallback 'waiting for Jenkins' image (local only)
   community.docker.docker_image:
@@ -141,6 +140,8 @@
       - "{{ uat_site_port }}:3000"
     recreate: true
     state: started
+    env:
+      FALLBACK_COLOR: uat
   when: not uat_image_available | default(false)
 
 - name: Remove untagged or older fallback Docker images

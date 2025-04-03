@@ -1,14 +1,14 @@
-# ansible/files/prod-waiting.Dockerfile
+# ansible/files/uat-waiting.Dockerfile
 
 FROM nginx:alpine
 
-# Replace NGINX config with shared fallback version
+# Use shared fallback NGINX config
 COPY default-waiting.conf /etc/nginx/conf.d/default.conf
 
-# Copy template HTML file that uses environment variable
-COPY index.template.html /usr/share/nginx/html/index.template.html
+# Copy UAT fallback HTML template using $FALLBACK_COLOR
+COPY uat-fallback-index.html /usr/share/nginx/html/index.template.html
 
-# Entry point generates final index.html at container runtime
+# Generate index.html dynamically using environment variable
 CMD ["/bin/sh", "-c", "envsubst < /usr/share/nginx/html/index.template.html > /usr/share/nginx/html/index.html && nginx -g 'daemon off;'"]
 
 EXPOSE 3000

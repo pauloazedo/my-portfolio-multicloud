@@ -1,0 +1,14 @@
+---
+# Automate Certbot renewal via cron (OL9-compatible, with Slack alert)
+
+- name: Ensure Certbot renewal via cron with Slack alert
+  ansible.builtin.cron:
+    name: "Renew Let's Encrypt certificates"
+    job: >-
+      certbot renew --quiet
+      --deploy-hook "/home/devops/slack-certbot-alert.sh {{ slack_cert_renewal_webhook }} {{ inventory_hostname }}"
+    minute: 0
+    hour: 3
+    user: root
+    cron_file: certbot-renewal
+  tags: certbot

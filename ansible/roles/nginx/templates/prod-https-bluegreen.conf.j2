@@ -1,22 +1,23 @@
-# Redirect HTTP to HTTPS
+# Redirect HTTP to HTTPS for both domains
 server {
     listen 80;
-    server_name oci.prod.pauloazedo.dev;
+    server_name oci.prod.pauloazedo.dev www.pauloazedo.dev;
     return 301 https://$host$request_uri;
 }
 
-# HTTPS configuration
+# HTTPS configuration for both domains
 server {
     listen 443 ssl;
-    server_name oci.prod.pauloazedo.dev;
+    server_name oci.prod.pauloazedo.dev www.pauloazedo.dev;
 
-    ssl_certificate /etc/letsencrypt/live/oci.prod.pauloazedo.dev/fullchain.pem;
+    ssl_certificate     /etc/letsencrypt/live/oci.prod.pauloazedo.dev/fullchain.pem;
     ssl_certificate_key /etc/letsencrypt/live/oci.prod.pauloazedo.dev/privkey.pem;
-    include /etc/letsencrypt/options-ssl-nginx.conf;
-    ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem;
+    include             /etc/letsencrypt/options-ssl-nginx.conf;
+    ssl_dhparam         /etc/letsencrypt/ssl-dhparams.pem;
 
     # Route / and /green to green container
     location ~ ^/(|green)(/.*)?$ {
+        rewrite ^/(green)?(/.*)?$ / break;
         proxy_pass http://localhost:3100;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
@@ -25,6 +26,7 @@ server {
 
     # Route /blue to blue container
     location /blue {
+        rewrite ^/blue(/.*)?$ / break;
         proxy_pass http://localhost:3200;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;

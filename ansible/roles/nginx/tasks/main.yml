@@ -1,7 +1,10 @@
 ---
 # NGINX role main task list
 
+############################################################
 # Step 1: Install and start NGINX
+############################################################
+
 - name: Ensure NGINX is installed
   ansible.builtin.package:
     name: nginx
@@ -13,14 +16,20 @@
     state: started
     enabled: true
 
-# Step 2: Configure SELinux (allow NGINX to proxy to Docker containers)
+############################################################
+# Step 2: Configure SELinux for NGINX Docker proxying
+############################################################
+
 - name: Allow NGINX to connect to the network (SELinux)
   ansible.posix.seboolean:
     name: httpd_can_network_connect
     state: true
     persistent: true
 
-# Step 3: Deploy initial HTTP configs
+############################################################
+# Step 3: Deploy HTTP-only configs before TLS provisioning
+############################################################
+
 - name: Deploy Jenkins HTTP config (UAT only)
   ansible.builtin.template:
     src: jenkins-http.conf.j2
@@ -42,7 +51,10 @@
     mode: '0644'
   when: inventory_hostname in groups['prod']
 
-# Step 4: Ensure certbot is available before running TLS provisioning
+############################################################
+# Step 4: Install Certbot and its NGINX plugin
+############################################################
+
 - name: Install certbot and certbot-nginx plugin
   ansible.builtin.package:
     name:
@@ -50,7 +62,30 @@
       - python3-certbot-nginx
     state: present
 
-# Step 5: Include certbot tasks (modularized in a separate file)
+############################################################
+# Step 5: Upload Slack notification script for cert alerts
+############################################################
+
+- name: Upload Slack certbot alert script to remote host
+  ansible.builtin.copy:
+    src: files/slack-certbot-alert.sh
+    dest: /home/devops/slack-certbot-alert.sh
+    mode: '0755'
+    owner: devops
+    group: devops
+
+############################################################
+# Step 6: Generate and configure HTTPS certificates
+############################################################
+
 - name: Include Certbot tasks
   ansible.builtin.include_tasks: certbot.yml
+  tags: certbot
+
+############################################################
+# Step 7: Setup automated renewal with Slack alert
+############################################################
+
+- name: Include Certbot renewal automation
+  ansible.builtin.include_tasks: renew.yml
   tags: certbot
