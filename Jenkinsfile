@@ -89,4 +89,4 @@ pipeline {
       echo "❌ Pipeline failed. Check previous logs."
     }
   }
-}
+}// test trigger
