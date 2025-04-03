@@ -37,7 +37,7 @@ pipeline {
     stage('Sync frontend code to UAT server') {
       steps {
         sh '''
-          rsync -az --delete ./my-portfolio/frontend/ devops@uat.pauloazedo.us:/home/devops/frontend
+          rsync -az --delete ./my-portfolio/frontend/ devops@oci.uat.pauloazedo.dev:/home/devops/frontend
         '''
       }
     }
