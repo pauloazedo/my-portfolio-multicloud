@@ -1,0 +1,21 @@
+---
+- name: Setup base infrastructure (PROD)
+  hosts: prod
+  become: true
+  vars_files:
+    - group_vars/all.secrets.yml
+  roles:
+    - { role: bootstrap, tags: bootstrap }
+    - { role: common, tags: common }
+    - { role: hardening, tags: hardening }
+    - { role: docker, tags: docker }
+    - { role: nginx, tags: nginx }
+    - { role: ssh_access, tags: ssh_access }
+
+- name: Deploy PROD web container (Blue/Green)
+  hosts: prod
+  become: true
+  vars_files:
+    - group_vars/all.secrets.yml
+  roles:
+    - { role: prod_site, tags: prod }

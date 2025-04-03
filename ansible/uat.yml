@@ -1,0 +1,29 @@
+---
+- name: Setup base infrastructure (UAT)
+  hosts: uat
+  become: true
+  vars_files:
+    - group_vars/all.secrets.yml
+  roles:
+    - { role: bootstrap, tags: bootstrap }
+    - { role: common, tags: common }
+    - { role: hardening, tags: hardening }
+    - { role: docker, tags: docker }
+    - { role: nginx, tags: nginx }
+    - { role: ssh_access, tags: ssh_access }
+
+- name: Setup Jenkins
+  hosts: uat
+  become: true
+  vars_files:
+    - group_vars/all.secrets.yml
+  roles:
+    - { role: jenkins, tags: jenkins }
+
+- name: Deploy UAT web container
+  hosts: uat
+  become: true
+  vars_files:
+    - group_vars/all.secrets.yml
+  roles:
+    - { role: uat_site, tags: uat }

@@ -1,16 +1,11 @@
 ---
-# Start Jenkins container using persistent /var/jenkins_home without JCasC
+# Start Jenkins container using persistent /var/jenkins_home
 
 - name: Check if Jenkins container exists
   community.docker.docker_container_info:
     name: jenkins
   register: jenkins_status
   ignore_errors: true
-
-- name: Check for Jenkins self-deployment marker
-  ansible.builtin.stat:
-    path: "{{ jenkins_data_dir }}/.jenkins_self_deploy"
-  register: jenkins_self_marker
 
 - name: Run Jenkins container with persistent volume and SSH key access
   community.docker.docker_container:
@@ -34,10 +29,9 @@
       retries: 5
       start_period: 30s
   when: >
-    (jenkins_status.container is not defined
-     or jenkins_status.container is none
-     or jenkins_status.container.State.Status != 'running')
-    and not jenkins_self_marker.stat.exists
+    jenkins_status.container is not defined
+    or jenkins_status.container is none
+    or jenkins_status.container.State.Status != 'running'
 
 - name: Fix permissions of .ssh directory inside Jenkins container
   community.docker.docker_container_exec:

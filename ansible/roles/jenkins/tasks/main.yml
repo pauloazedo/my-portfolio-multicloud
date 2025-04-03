@@ -1,23 +1,10 @@
 ---
 # Main Jenkins role task entrypoint
 
-- name: Prepare Jenkins data directory
-  ansible.builtin.include_tasks: prepare.yml
-  tags: jenkins
-
-- name: Mark playbook run as Jenkins-self-deployed (used to block container restarts)
-  ansible.builtin.include_tasks: marker.yml
-  when: lookup('env', 'JENKINS_PIPELINE_DEPLOY') == 'true'
-  tags: jenkins
-
 - name: Run Jenkins container with persistent data
   ansible.builtin.include_tasks: container.yml
   tags: jenkins
 
 - name: Install tools inside Jenkins container
   ansible.builtin.include_tasks: tools.yml
-  tags: jenkins
-
-- name: Setup SSH access for Jenkins
-  ansible.builtin.include_tasks: ssh.yml
   tags: jenkins
