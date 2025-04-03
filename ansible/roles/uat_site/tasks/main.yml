@@ -27,36 +27,28 @@
     state: absent
     force_kill: true
 
-- name: Try to pull UAT site image from OCI
+- name: Attempt to pull UAT site image from OCIR
   community.docker.docker_image:
     name: "{{ uat_site_image }}"
     source: pull
   register: uat_image_pull
-  failed_when: false
   ignore_errors: true
+  failed_when: false
 
-- name: Check if UAT image exists locally (fallback check)
+- name: Check if image exists locally
   community.docker.docker_image_info:
     name: "{{ uat_site_image }}"
   register: uat_local_image_info
   failed_when: false
   changed_when: false
 
-- name: Set image availability flag
+- name: Set fact if image is available
   ansible.builtin.set_fact:
-    uat_image_available: >-
-      {{ ('Image is up to date' in (uat_image_pull.msg | default('')))
-         or ('Downloaded newer image' in (uat_image_pull.msg | default('')))
-         or (uat_image_pull.changed | default(false))
-         or (uat_local_image_info.images | length > 0) }}
+    uat_image_available: "{{ uat_local_image_info.images | length > 0 }}"
 
-- name: Show pull result
+- name: Debug image pull result
   ansible.builtin.debug:
-    var: uat_image_pull.msg
-
-- name: Show UAT image availability flag
-  ansible.builtin.debug:
-    var: uat_image_available
+    msg: "Image pulled: {{ uat_image_pull.changed }}, Local image found: {{ uat_image_available }}"
 
 - name: Include task to run real app if image is available
   ansible.builtin.import_tasks: run-real.yml
@@ -64,4 +56,4 @@
 
 - name: Include fallback cleanup tasks
   ansible.builtin.import_tasks: cleanup.yml
-  when: uat_image_available is defined and not uat_image_available
+  when: not (uat_image_available | default(false))
