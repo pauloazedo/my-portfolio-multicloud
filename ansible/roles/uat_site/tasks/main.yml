@@ -35,11 +35,20 @@
   failed_when: false
   ignore_errors: true
 
+- name: Check if UAT image exists locally (fallback check)
+  community.docker.docker_image_info:
+    name: "{{ uat_site_image }}"
+  register: uat_local_image_info
+  failed_when: false
+  changed_when: false
+
 - name: Set image availability flag
   ansible.builtin.set_fact:
     uat_image_available: >-
-      {{ ('Image is up to date' in uat_image_pull.msg)
-         or ('Downloaded newer image' in uat_image_pull.msg) }}
+      {{ ('Image is up to date' in (uat_image_pull.msg | default('')))
+         or ('Downloaded newer image' in (uat_image_pull.msg | default('')))
+         or (uat_image_pull.changed | default(false))
+         or (uat_local_image_info.images | length > 0) }}
 
 - name: Show pull result
   ansible.builtin.debug:
