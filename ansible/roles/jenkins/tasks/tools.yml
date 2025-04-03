@@ -23,4 +23,3 @@
                mkdir -p /var/jenkins_home/.ssh &&
                ssh-keyscan -H oci.uat.pauloazedo.dev >> /var/jenkins_home/.ssh/known_hosts &&
                chmod 644 /var/jenkins_home/.ssh/known_hosts"
-

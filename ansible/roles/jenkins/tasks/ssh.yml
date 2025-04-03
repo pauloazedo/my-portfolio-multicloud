@@ -1,5 +1,5 @@
 ---
-# SSH keypair generation and access setup for Jenkins
+# Setup SSH access for Jenkins
 
 - name: Ensure Jenkins .ssh directory exists with correct permissions
   ansible.builtin.file:
@@ -17,28 +17,16 @@
     mode: '0600'
     owner: "{{ ansible_user }}"
     group: "{{ ansible_user }}"
-    regenerate: never  # don't overwrite existing keys
+    regenerate: never  # only generate if not present
 
-- name: Set proper permissions on public key
-  ansible.builtin.file:
-    path: "{{ jenkins_data_dir }}/.ssh/id_rsa.pub"
-    mode: '0644'
-    owner: "{{ ansible_user }}"
-    group: "{{ ansible_user }}"
+- name: Read generated Jenkins public key (remote)
+  ansible.builtin.slurp:
+    src: "{{ jenkins_data_dir }}/.ssh/id_rsa.pub"
+  register: jenkins_pub_key
 
 - name: Add Jenkins public key to UAT server authorized_keys
-  ansible.posix.authorized_key:
+  ansible.builtin.authorized_key:
     user: "{{ ansible_user }}"
     state: present
-    key: "{{ lookup('file', jenkins_data_dir + '/.ssh/id_rsa.pub') }}"
+    key: "{{ jenkins_pub_key['content'] | b64decode }}"
     manage_dir: true
-
-- name: Pre-approve UAT host key for Jenkins known_hosts file
-  ansible.builtin.known_hosts:
-    name: "oci.uat.pauloazedo.dev"
-    key: "{{ lookup('pipe', 'ssh-keyscan -H oci.uat.pauloazedo.dev') }}"
-    path: "{{ jenkins_data_dir }}/.ssh/known_hosts"
-    owner: "{{ ansible_user }}"
-    group: "{{ ansible_user }}"
-    mode: '0644'
-    state: present
