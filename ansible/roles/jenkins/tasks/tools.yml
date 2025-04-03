@@ -3,7 +3,7 @@
 
 - name: Install Python, pip, Ansible, OCI SDK, Node.js, npm, and rsync inside Jenkins container
   community.docker.docker_container_exec:
-    container: jenkins
+    container: "{{ jenkins_container_name }}"
     command: >
       bash -c "
         apt-get update &&
@@ -14,3 +14,11 @@
         /home/jenkins/venv/bin/pip install --upgrade pip &&
         /home/jenkins/venv/bin/pip install ansible oci
       "
+
+# Approve SSH host key inside Jenkins container (writing directly to mounted volume)
+- name: Approve SSH host key inside Jenkins container
+  community.docker.docker_container_exec:
+    container: "{{ jenkins_container_name }}"
+    command: >
+      bash -c "mkdir -p /var/jenkins_home/.ssh &&
+               ssh-keyscan -H oci.uat.pauloazedo.dev >> /var/jenkins_home/.ssh/known_hosts"

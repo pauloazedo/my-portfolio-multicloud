@@ -27,3 +27,9 @@ jenkins_init_dir: "{{ jenkins_data_dir }}/init.groovy.d"
 # Init script filename
 jenkins_init_script: "01-admin-user.groovy"
 jenkins_init_dest_path: "{{ jenkins_init_dir }}/{{ jenkins_init_script }}"
+
+# Jenkins container name
+jenkins_container_name: jenkins
+
+# Jenkins healthcheck path
+jenkins_healthcheck_url: "http://localhost:{{ jenkins_http_port }}/login"
