@@ -59,6 +59,12 @@ uat_site_waiting_image: "iad.ocir.io/{{ ocir_namespace }}/uat-waiting:latest"
 uat_site_container: "uat-site"
 uat_site_port: 3000
 
+# Variables for Ansible image build
+uat_site_git_repo: "https://github.com/pauloazedo/my-portfolio-oci-devops.git"
+uat_site_git_branch: "uat"
+uat_site_dockerfile_path: "my-portfolio/frontend"
+uat_site_image_tag: "{{ lookup('pipe', 'git rev-parse --short HEAD') }}"
+
 ############################################################
 # PROD Site Configuration (Blue/Green Deployment)
 ############################################################
