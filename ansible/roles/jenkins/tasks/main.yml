@@ -3,8 +3,6 @@
 
 - name: Run Jenkins container with persistent data
   ansible.builtin.include_tasks: container.yml
-  tags: jenkins
 
 - name: Install tools inside Jenkins container
   ansible.builtin.include_tasks: tools.yml
-  tags: jenkins

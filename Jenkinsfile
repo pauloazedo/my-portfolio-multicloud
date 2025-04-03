@@ -65,7 +65,7 @@ pipeline {
             export ANSIBLE_SSH_ARGS="-i ${SSH_KEY_PATH} -o StrictHostKeyChecking=accept-new"
             export ANSIBLE_REMOTE_USER=${ANSIBLE_REMOTE_USER}
 
-            /home/jenkins/venv/bin/ansible-playbook -i ${ANSIBLE_INVENTORY} ansible/site.yml \
+            /home/jenkins/venv/bin/ansible-playbook -i ${ANSIBLE_INVENTORY} ansible/uat.yml \
               --limit uat \
               --tags uat_site \
               --extra-vars "uat_site_custom_image=${OCIR_REPO}:${IMAGE_TAG} \

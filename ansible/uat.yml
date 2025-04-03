@@ -10,7 +10,7 @@
     - { role: hardening, tags: hardening }
     - { role: docker, tags: docker }
     - { role: nginx, tags: nginx }
-    - { role: ssh_access, tags: ssh_access }
+    - { role: ssh_access, tags: set_ssh_access }
 
 - name: Setup Jenkins
   hosts: uat
@@ -18,7 +18,7 @@
   vars_files:
     - group_vars/all.secrets.yml
   roles:
-    - { role: jenkins, tags: jenkins }
+    - { role: jenkins, tags: jenkins_setup }
 
 - name: Deploy UAT web container
   hosts: uat
@@ -26,4 +26,4 @@
   vars_files:
     - group_vars/all.secrets.yml
   roles:
-    - { role: uat_site, tags: uat }
+    - { role: uat_site, tags: uat_site }

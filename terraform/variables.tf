@@ -46,13 +46,16 @@ variable "ssh_public_key_path" {
 
 # === JENKINS VOLUME ===
 
+# The Jenkins volume is created manually in the root compartment
+# to ensure persistent data storage across terraform destroy/apply cycles.
+# Terraform only attaches this volume to the UAT instance — it does not manage lifecycle.
 variable "jenkins_volume_ocid" {
   type        = string
-  description = "OCID of the pre-created OCI Block Volume used for Jenkins data"
+  description = "OCID of the pre-created OCI Block Volume (in root compartment) used for Jenkins data"
 }
 
 variable "jenkins_volume_device" {
   type        = string
   default     = "/dev/oracleoci/oraclevdb"
-  description = "Linux device path to attach Jenkins block volume"
+  description = "Linux device path where the Jenkins block volume will be attached"
 }
