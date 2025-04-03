@@ -1,22 +1,21 @@
 ---
 # Main Jenkins role task entrypoint
 
+# Step 1: Prepare Jenkins volume and SSH key infrastructure
 - name: Prepare Jenkins data directory
   ansible.builtin.include_tasks: prepare.yml
   tags: jenkins
 
+- name: Setup SSH access for Jenkins (generate key + authorize on target)
+  ansible.builtin.include_tasks: ssh.yml
+  tags: jenkins
+
+# Step 2: Start Jenkins container with mounted data and SSH keys
 - name: Run Jenkins container with persistent data
   ansible.builtin.include_tasks: container.yml
   tags: jenkins
 
+# Step 3: Install Jenkins dependencies inside the container
 - name: Install tools inside Jenkins container
   ansible.builtin.include_tasks: tools.yml
-  tags: jenkins
-
-- name: Setup SSH access for Jenkins
-  ansible.builtin.include_tasks: ssh.yml
-  tags: ssh
-
-- name: Set up SSH access for Jenkins to deploy targets
-  ansible.builtin.include_tasks: ssh.yml
   tags: jenkins
