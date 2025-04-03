@@ -1,12 +1,10 @@
 ---
-# UAT Site Deployment with fallback and image labeling
+# UAT Site Deployment Entry Point
 
-# Step 1: Ensure Docker is installed
 - name: Ensure Docker is installed on UAT
   ansible.builtin.include_role:
     name: docker
 
-# Step 2: Authenticate to OCIR (if not already logged in)
 - name: Check if already logged into OCIR
   ansible.builtin.command: docker info
   register: docker_info_check
@@ -23,14 +21,12 @@
   no_log: true
   changed_when: false
 
-# Step 3: Stop and remove any existing container
 - name: Stop and remove existing UAT site container (if any)
   community.docker.docker_container:
     name: "{{ uat_site_container }}"
     state: absent
     force_kill: true
 
-# Step 4: Try pulling UAT image from OCI Registry
 - name: Try to pull UAT site image from OCI
   community.docker.docker_image:
     name: "{{ uat_site_image }}"
@@ -39,7 +35,6 @@
   failed_when: false
   ignore_errors: true
 
-# Step 5: Set image availability flag based on pull result message
 - name: Set image availability flag
   ansible.builtin.set_fact:
     uat_image_available: >-
@@ -54,123 +49,10 @@
   ansible.builtin.debug:
     var: uat_image_available
 
-# Step 6: Run UAT container if image is available
-- name: Run UAT site container (real app)
-  community.docker.docker_container:
-    name: "{{ uat_site_container }}"
-    image: "{{ uat_site_image }}"
-    restart_policy: always
-    published_ports:
-      - "{{ uat_site_port }}:3000"
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3000/healthz"]
-      interval: 30s
-      timeout: 5s
-      retries: 3
-      start_period: 10s
-    recreate: true
-    state: started
+- name: Include task to run real app if image is available
+  ansible.builtin.import_tasks: run-real.yml
   when: uat_image_available | default(false)
 
-# Step 7: Fallback - build, tag, push, and deploy waiting container
-
-- name: Copy fallback UAT Dockerfile to remote host
-  ansible.builtin.copy:
-    src: files/uat-waiting.Dockerfile
-    dest: /home/devops/uat-waiting.Dockerfile
-    owner: devops
-    group: devops
-    mode: '0644'
-  when: not uat_image_available | default(false)
-
-- name: Copy shared fallback NGINX config to remote host
-  ansible.builtin.copy:
-    src: files/default-waiting.conf
-    dest: /home/devops/default-waiting.conf
-    owner: devops
-    group: devops
-    mode: '0644'
-  when: not uat_image_available | default(false)
-
-- name: Copy fallback HTML page to remote host
-  ansible.builtin.copy:
-    src: files/uat-fallback-index.html
-    dest: /home/devops/uat-fallback-index.html
-    owner: devops
-    group: devops
-    mode: '0644'
-
-- name: Build fallback 'waiting for Jenkins' image (local only)
-  community.docker.docker_image:
-    name: "uat-waiting"
-    tag: "latest"
-    source: build
-    force_source: true
-    build:
-      path: /home/devops
-      dockerfile: uat-waiting.Dockerfile
-      labels:
-        org.opencontainers.image.created: "{{ ansible_date_time.iso8601 }}"
-        org.opencontainers.image.description: "Fallback UAT site - waiting for Jenkins"
-        org.opencontainers.image.source: "ansible"
-  when: not uat_image_available | default(false)
-
-- name: Tag fallback image for OCIR
-  ansible.builtin.command:
-    cmd: >
-      docker tag uat-waiting:latest {{ uat_site_waiting_image }}
-  when: not uat_image_available | default(false)
-  changed_when: true
-  check_mode: false
-
-- name: Push fallback image to OCIR
-  ansible.builtin.command:
-    cmd: >
-      docker push {{ uat_site_waiting_image }}
-  when: not uat_image_available | default(false)
-  changed_when: true
-  check_mode: false
-
-- name: Run fallback UAT container (waiting page)
-  community.docker.docker_container:
-    name: "{{ uat_site_container }}"
-    image: "{{ uat_site_waiting_image }}"
-    restart_policy: always
-    published_ports:
-      - "{{ uat_site_port }}:3000"
-    recreate: true
-    state: started
-    env:
-      FALLBACK_COLOR: uat
-  when: not uat_image_available | default(false)
-
-- name: Remove untagged or older fallback Docker images
-  ansible.builtin.shell: |
-    set -o pipefail
-    docker images --filter=reference='uat-waiting' --format '{{ '{{' }}.Repository{{ '}}' }}:{{ '{{' }}.Tag{{ '}}' }} {{ '{{' }}.ID{{ '}}' }}' |
-    grep -v 'uat-waiting:latest' | awk '{print $2}' | xargs -r docker rmi
-  args:
-    executable: /bin/bash
-  register: cleanup_result
-  changed_when: cleanup_result.stdout != ""
-  failed_when: false
+- name: Include fallback cleanup tasks
+  ansible.builtin.import_tasks: cleanup.yml
   when: uat_image_available is defined and not uat_image_available
-
-# Step 8: Cleanup temporary build files
-- name: Clean up temporary Dockerfile from remote host
-  ansible.builtin.file:
-    path: /home/devops/uat-waiting.Dockerfile
-    state: absent
-  when: not uat_image_available | default(false)
-
-- name: Clean up temporary fallback NGINX config from remote host
-  ansible.builtin.file:
-    path: /home/devops/default-waiting.conf
-    state: absent
-  when: not uat_image_available | default(false)
-
-- name: Clean up temporary fallback index.html from remote host
-  ansible.builtin.file:
-    path: /home/devops/index.html
-    state: absent
-  when: not uat_image_available | default(false)

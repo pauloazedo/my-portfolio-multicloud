@@ -2,8 +2,8 @@ pipeline {
   agent any
 
   environment {
-    OCIR_REPO = "iad.ocir.io/idtijq8cx4jl/uat-site"
     ANSIBLE_INVENTORY = "ansible/inventory/hosts"
+    OCIR_REPO = "iad.ocir.io/idtijq8cx4jl/uat-site"
     IMAGE_TAG = ""
   }
 
@@ -13,7 +13,7 @@ pipeline {
   }
 
   triggers {
-    pollSCM('H/5 * * * *') // Optional fallback to detect changes every 5 minutes
+    pollSCM('H/5 * * * *')
   }
 
   stages {
@@ -28,54 +28,27 @@ pipeline {
     stage('Set Image Tag') {
       steps {
         script {
-          // Short SHA for image tagging
           IMAGE_TAG = sh(script: "git rev-parse --short HEAD", returnStdout: true).trim()
           env.IMAGE_TAG = IMAGE_TAG
         }
       }
     }
 
-    stage('Install Dependencies') {
+    stage('Sync frontend code to UAT server') {
       steps {
-        dir('my-portfolio/frontend') {
-          sh 'npm install'
-        }
+        sh '''
+          rsync -az --delete ./my-portfolio/frontend/ devops@uat.pauloazedo.us:/home/devops/frontend
+        '''
       }
     }
 
-    stage('Build Next.js App') {
-      steps {
-        dir('my-portfolio/frontend') {
-          sh 'npm run build'
-        }
-      }
-    }
-
-    stage('Build Docker Image') {
-      steps {
-        dir('my-portfolio/frontend') {
-          sh "docker build -t ${OCIR_REPO}:${IMAGE_TAG} ."
-        }
-      }
-    }
-
-    stage('Push to OCIR') {
-      steps {
-        withCredentials([usernamePassword(credentialsId: 'ocir-creds', usernameVariable: 'OCIR_USER', passwordVariable: 'OCIR_TOKEN')]) {
-          sh """
-            echo "${OCIR_TOKEN}" | docker login iad.ocir.io -u "${OCIR_USER}" --password-stdin
-            docker push ${OCIR_REPO}:${IMAGE_TAG}
-          """
-        }
-      }
-    }
-
-    stage('Deploy to UAT') {
+    stage('Trigger Ansible Deployment') {
       steps {
         sh """
           ansible-playbook -i ${ANSIBLE_INVENTORY} ansible/site.yml \
             --limit uat \
-            --extra-vars "uat_site_custom_image=${OCIR_REPO}:${IMAGE_TAG}"
+            --extra-vars "uat_site_custom_image=${OCIR_REPO}:${IMAGE_TAG} \
+                          uat_site_image_tag=${IMAGE_TAG}"
         """
       }
     }
@@ -83,10 +56,10 @@ pipeline {
 
   post {
     success {
-      echo "✅ UAT deployment completed for image: ${OCIR_REPO}:${IMAGE_TAG}"
+      echo "✅ Ansible-driven UAT deployment completed for image: ${OCIR_REPO}:${IMAGE_TAG}"
     }
     failure {
-      echo "❌ Pipeline failed. Check previous logs."
+      echo "❌ Pipeline failed. Check logs"
     }
   }
-}// test trigger
+}

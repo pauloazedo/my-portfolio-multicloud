@@ -1,0 +1,29 @@
+# ansible/roles/uat_site/tasks/image.yml
+---
+
+- name: Ensure Git is installed
+  ansible.builtin.package:
+    name: git
+    state: present
+
+- name: Clone portfolio repository (UAT branch)
+  ansible.builtin.git:
+    repo: "{{ uat_site_git_repo }}"
+    dest: "/home/devops/uat-repo"
+    version: "{{ uat_site_git_branch }}"
+    force: yes
+    update: yes
+    accept_hostkey: yes
+  become: true
+  become_user: devops
+
+- name: Build and tag UAT Docker image
+  community.docker.docker_image:
+    name: "{{ ocir_namespace }}/uat-site"
+    tag: "{{ uat_site_image_tag }}"
+    build:
+      path: "/home/devops/uat-repo/{{ uat_site_dockerfile_path }}"
+    source: build
+    push: true
+  vars:
+    ocir_namespace: "iad.ocir.io/idtijq8cx4jl"

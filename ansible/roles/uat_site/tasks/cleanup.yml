@@ -1,0 +1,19 @@
+# ansible/roles/uat_site/tasks/cleanup.yml
+---
+
+- name: Cleanup fallback Docker images except the latest
+  ansible.builtin.shell: |
+    set -o pipefail
+    docker images --filter=reference='uat-waiting' --format '{{ '{{' }}.Repository{{ '}}' }}:{{ '{{' }}.Tag{{ '}}' }} {{ '{{' }}.ID{{ '}}' }}' |
+    grep -v 'uat-waiting:latest' | awk '{print $2}' | xargs -r docker rmi
+  args:
+    executable: /bin/bash
+  register: cleanup_result
+  changed_when: cleanup_result.stdout != ""
+  failed_when: false
+  when: uat_image_available is defined and not uat_image_available
+
+- name: Show fallback image cleanup result
+  ansible.builtin.debug:
+    msg: "{{ cleanup_result.stdout_lines | default([]) }}"
+  when: cleanup_result.stdout_lines is defined
