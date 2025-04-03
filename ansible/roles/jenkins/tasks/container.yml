@@ -7,6 +7,11 @@
   register: jenkins_status
   ignore_errors: true
 
+- name: Check for Jenkins self-deployment marker
+  ansible.builtin.stat:
+    path: "{{ jenkins_data_dir }}/.jenkins_self_deploy"
+  register: jenkins_self_marker
+
 - name: Run Jenkins container with persistent volume and SSH key access
   community.docker.docker_container:
     name: jenkins
@@ -29,15 +34,17 @@
       retries: 5
       start_period: 30s
   when: >
-    jenkins_status.container is not defined
-    or jenkins_status.container is none
-    or jenkins_status.container.State.Status != 'running'
+    (jenkins_status.container is not defined
+     or jenkins_status.container is none
+     or jenkins_status.container.State.Status != 'running')
+    and not jenkins_self_marker.stat.exists
 
 - name: Fix permissions of .ssh directory inside Jenkins container
   community.docker.docker_container_exec:
     container: jenkins
-    command: |
-      bash -c "chmod 700 /var/jenkins_home/.ssh && chmod 600 /var/jenkins_home/.ssh/id_rsa"
+    command: >
+      bash -c "chmod 700 /var/jenkins_home/.ssh &&
+               chmod 600 /var/jenkins_home/.ssh/id_rsa"
   register: ssh_perm_fix
   changed_when: false
   ignore_errors: true
