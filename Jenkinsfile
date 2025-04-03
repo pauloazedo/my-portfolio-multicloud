@@ -45,7 +45,7 @@ pipeline {
 
     stage('Build Next.js App') {
       steps {
-        dir('frontend') {
+        dir('my-portfolio/frontend') {
           sh 'npm run build'
         }
       }
@@ -53,7 +53,7 @@ pipeline {
 
     stage('Build Docker Image') {
       steps {
-        dir('frontend') {
+        dir('my-portfolio/frontend') {
           sh "docker build -t ${OCIR_REPO}:${IMAGE_TAG} ."
         }
       }
