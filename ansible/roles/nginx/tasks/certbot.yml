@@ -5,15 +5,18 @@
 - name: Define domains and templates per environment
   ansible.builtin.set_fact:
     nginx_certbot_domains:
-      - domains: ["oci.jenkins.pauloazedo.dev"]
+      - domains: ["{{ jenkins_fqdn }}"]
         template: "jenkins-https.conf.j2"
         filename: "jenkins.conf"
         group: "uat"
-      - domains: ["oci.uat.pauloazedo.dev"]
+      - domains: ["{{ uat_fqdn }}"]
         template: "uat-https.conf.j2"
         filename: "uat.conf"
         group: "uat"
-      - domains: ["oci.prod.pauloazedo.dev", "www.pauloazedo.dev"]
+      - domains: >-
+          {{
+            [prod_fqdn] + ([prod_www_fqdn] if cloud_provider == default_provider else [])
+          }}
         template: "prod-https-bluegreen.conf.j2"
         filename: "prod.conf"
         group: "prod"

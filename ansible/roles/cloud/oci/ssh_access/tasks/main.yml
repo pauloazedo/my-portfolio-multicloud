@@ -21,16 +21,16 @@
 
 - name: Approve SSH host key for UAT server
   ansible.builtin.known_hosts:
-    name: oci.uat.pauloazedo.dev
-    key: "{{ lookup('pipe', 'ssh-keyscan -H oci.uat.pauloazedo.dev') }}"
+    name: "{{ uat_fqdn }}"
+    key: "{{ lookup('pipe', 'ssh-keyscan -H ' + uat_fqdn) }}"
     path: "{{ jenkins_data_dir }}/.ssh/known_hosts"
     state: present
   become: true
 
 - name: Approve SSH host key for PROD server
   ansible.builtin.known_hosts:
-    name: oci.prod.pauloazedo.dev
-    key: "{{ lookup('pipe', 'ssh-keyscan -H oci.prod.pauloazedo.dev') }}"
+    name: "{{ prod_fqdn }}"
+    key: "{{ lookup('pipe', 'ssh-keyscan -H ' + prod_fqdn) }}"
     path: "{{ jenkins_data_dir }}/.ssh/known_hosts"
     state: present
   become: true

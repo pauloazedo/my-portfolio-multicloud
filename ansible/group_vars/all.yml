@@ -11,6 +11,9 @@ jenkins_plugins_txt: /home/devops/jenkins_data/plugins.txt
 jenkins_init_dir: /home/devops/jenkins_data/init
 jenkins_config_dir: /home/devops/jenkins_config
 
+# Provider that will host the www.pauloazedo.dev domain
+default_provider: "oci"
+
 jenkins_plugins:
   - workflow-aggregator
   - git
