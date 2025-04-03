@@ -162,4 +162,4 @@ Planned additions:
 
 MIT License — fork, reuse, improve.
 
-.
+Added line to test.
