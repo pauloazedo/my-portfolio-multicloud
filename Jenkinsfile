@@ -37,7 +37,7 @@ pipeline {
     stage('Sync frontend code to UAT server') {
       steps {
         sh '''
-          rsync -az --delete -e "ssh -i ~/.ssh/id_rsa \
+          rsync -az --delete -e "ssh -i /var/jenkins_home/.ssh/id_rsa \
           -o StrictHostKeyChecking=accept-new" ./my-portfolio/frontend/ \
           devops@oci.uat.pauloazedo.dev:/home/devops/frontend
         '''
