@@ -161,5 +161,3 @@ Planned additions:
 ## License
 
 MIT License — fork, reuse, improve.
-
-Test
