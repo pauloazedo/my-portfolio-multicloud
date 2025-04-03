@@ -74,4 +74,5 @@ roles/*/
 # -------------------
 .vercel/
 .DS_Store
-.vscode/
+.vscode/ansible/files/id_rsa_jenkins
+ansible/files/id_rsa_jenkins
