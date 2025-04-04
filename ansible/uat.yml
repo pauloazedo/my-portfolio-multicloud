@@ -1,10 +1,16 @@
----
 # UAT Infrastructure and Application Deployment
 
 # Step 1: Setup base infrastructure (UAT)
 - name: Setup base infrastructure (UAT)
   hosts: uat
   become: true
+  vars:
+    bootstrap_role: "cloud/oci/bootstrap"  # Full path to bootstrap role
+    common_role: "cloud/oci/common"       # Full path to common role
+    hardening_role: "cloud/oci/hardening" # Full path to hardening role
+    docker_role: "cloud/oci/docker"       # Full path to docker role
+    ssh_access_role: "cloud/oci/ssh_access" # Full path to ssh_access role
+    jenkins_volume: "cloud/oci/jenkins_volume" # Full path to jenkins_volume role
   vars_files:
     - group_vars/all.yml
     - group_vars/all.secrets.yml
@@ -31,40 +37,30 @@
         name: "{{ docker_role }}"
       tags: docker
 
-    - name: Include nginx role
-      ansible.builtin.include_role:
-        name: "nginx"
-      tags: nginx
-
     - name: Include SSH access role
       ansible.builtin.include_role:
         name: "{{ ssh_access_role }}"
       tags: set_ssh_access
 
+    - name: Include jenkins_volume role
+      ansible.builtin.include_role:
+        name: "{{ jenkins_volume }}"
+      tags: set_jenkins_volume
+
 # Step 2: Mount Jenkins block volume (provider-specific)
 - name: Attach and mount Jenkins block volume
   hosts: uat
   become: true
-  vars_files:
-    - group_vars/all.yml
-    - group_vars/all.secrets.yml
-    - group_vars/{{ cloud_provider }}/{{ cloud_provider }}.yml
-    - group_vars/{{ cloud_provider }}/{{ cloud_provider }}.secrets.yml
   tasks:
     - name: Include Jenkins volume role from provider definition
       ansible.builtin.include_role:
-        name: "{{ jenkins_volume_role }}"
+        name: "{{ jenkins_volume }}"
       tags: jenkins_volume
 
 # Step 3: Setup Jenkins
 - name: Setup Jenkins
   hosts: uat
   become: true
-  vars_files:
-    - group_vars/all.yml
-    - group_vars/all.secrets.yml
-    - group_vars/{{ cloud_provider }}/{{ cloud_provider }}.yml
-    - group_vars/{{ cloud_provider }}/{{ cloud_provider }}.secrets.yml
   roles:
     - role: jenkins
       tags: jenkins_setup
@@ -73,11 +69,6 @@
 - name: Deploy UAT web container
   hosts: uat
   become: true
-  vars_files:
-    - group_vars/all.yml
-    - group_vars/all.secrets.yml
-    - group_vars/{{ cloud_provider }}/{{ cloud_provider }}.yml
-    - group_vars/{{ cloud_provider }}/{{ cloud_provider }}.secrets.yml
   roles:
     - role: uat_site
       tags: uat_site

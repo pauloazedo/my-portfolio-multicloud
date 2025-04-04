@@ -6,3 +6,27 @@
 
 - name: Install tools inside Jenkins container
   ansible.builtin.include_tasks: tools.yml
+
+- name: Ensure Jenkins data directory exists
+  ansible.builtin.file:
+    path: "{{ jenkins_data_dir }}"
+    state: directory
+    mode: '0700'
+
+- name: Ensure Jenkins container is running
+  community.docker.docker_container:
+    name: "{{ jenkins_container_name }}"
+    image: "{{ jenkins_image }}:{{ jenkins_image_tag }}"
+    state: started
+    restart_policy: always
+    volumes:
+      - "{{ jenkins_data_dir }}:/var/jenkins_home"
+    ports:
+      - "{{ jenkins_http_port }}:8080"
+      - "{{ jenkins_agent_port }}:50000"
+    healthcheck:
+      test: "curl --fail {{ jenkins_healthcheck_url }} || exit 1"
+      interval: 30s
+      retries: 3
+      start_period: 5s
+      timeout: 10s

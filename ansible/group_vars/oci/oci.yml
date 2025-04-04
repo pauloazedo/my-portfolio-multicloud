@@ -1,4 +1,3 @@
-# ansible/group_vars/oci/oci.yml
 # OCI-specific configuration
 
 ############################################################
@@ -15,9 +14,16 @@ uat_domain: "oci.uat.pauloazedo.dev"
 prod_domain: "oci.prod.pauloazedo.dev"
 
 ############################################################
+# Define Full FQDN Variables
+############################################################
+jenkins_fqdn: "{{ jenkins_domain }}"
+uat_fqdn: "{{ uat_domain }}"
+prod_fqdn: "{{ prod_domain }}"
+
+############################################################
 # Jenkins Volume Role for OCI
 ############################################################
-jenkins_volume_role: "cloud/oci/volume"
+jenkins_volume_role: "cloud/oci/jenkins_volume"
 
 ############################################################
 # UAT Site Configuration
@@ -51,3 +57,6 @@ prod_site_waiting_image: "iad.ocir.io/{{ ocir_namespace }}/prod-waiting:latest"
 # Slack Notifications
 ############################################################
 slack_cert_renewal_webhook: "https://hooks.slack.com/services/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"
+
+# Jenkins Data Directory
+jenkins_data_dir: "/mnt/jenkins_data"   # Now defined here for OCI

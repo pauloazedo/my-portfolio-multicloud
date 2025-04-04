@@ -1,4 +1,3 @@
----
 # Default values for Jenkins role
 
 # Jenkins Docker image
@@ -9,8 +8,8 @@ jenkins_image_tag: lts
 jenkins_http_port: 8080
 jenkins_agent_port: 50000
 
-# Jenkins data volume
-jenkins_data_dir: /home/devops/jenkins_data
+# Jenkins data volume (fallback if not defined in group_vars)
+jenkins_data_dir: "/home/devops/jenkins_data"  # Default if not overridden
 
 # Jenkins container name
 jenkins_container_name: jenkins

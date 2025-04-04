@@ -30,10 +30,6 @@ resource "oci_core_instance" "uat" {
     memory_in_gbs = 12
   }
 
-  defined_tags = {
-    "${data.oci_identity_tag_namespaces.devops.tag_namespaces[0].name}.${data.oci_identity_tags.access.tags[0].name}" = "vault"
-  }
-
   metadata = {
     ssh_authorized_keys = file(var.ssh_public_key_path)
     user_data = base64encode(<<-EOT
@@ -54,17 +50,15 @@ resource "oci_core_instance" "uat" {
     source_id               = "ocid1.image.oc1.iad.aaaaaaaawvs4xn6dfl6oo45o2ntziecjy2cbet2mlidvx3ji62oi3jai4u5a"
     boot_volume_size_in_gbs = 55
   }
-
-  depends_on = [data.oci_identity_tags.access]
 }
 
 # === Attach Jenkins Block Volume ===
 resource "oci_core_volume_attachment" "jenkins_data" {
-  instance_id      = oci_core_instance.uat.id
-  volume_id        = var.jenkins_volume_ocid
-  attachment_type  = "paravirtualized"
-  device           = var.jenkins_volume_device
-  display_name     = "jenkins-volume-attachment"
+  instance_id     = oci_core_instance.uat.id
+  volume_id       = var.jenkins_volume_ocid
+  attachment_type = "paravirtualized"
+  device          = var.jenkins_volume_device
+  display_name    = "jenkins-volume-attachment"
 }
 
 # === VNIC & Public IP Resolution ===
@@ -99,7 +93,7 @@ resource "cloudflare_dns_record" "oci_jenkins" {
   depends_on = [oci_core_instance.uat]
 }
 
-# === OCI CONTAINER REPOSITORIES (Root Compartment) ===
+# === OCI CONTAINER REPOSITORIES ===
 resource "oci_artifacts_container_repository" "uat_waiting" {
   compartment_id = var.tenancy_ocid
   display_name   = "uat-waiting"

@@ -25,26 +25,6 @@ provider "cloudflare" {
   api_token = var.cloudflare_api_token
 }
 
-# === OCI TAGS (Vault access via tag) ===
-
-data "oci_identity_tag_namespaces" "devops" {
-  compartment_id = var.tenancy_ocid
-
-  filter {
-    name   = "name"
-    values = ["DevOps"]
-  }
-}
-
-data "oci_identity_tags" "access" {
-  tag_namespace_id = data.oci_identity_tag_namespaces.devops.tag_namespaces[0].id
-
-  filter {
-    name   = "name"
-    values = ["access"]
-  }
-}
-
 # === AVAILABILITY DOMAINS ===
 data "oci_identity_availability_domains" "ads" {
   compartment_id = var.tenancy_ocid
@@ -147,21 +127,4 @@ resource "oci_core_network_security_group_security_rule" "allow_https" {
   }
 
   description = "Allow HTTPS"
-}
-
-resource "oci_core_network_security_group_security_rule" "allow_jenkins" {
-  network_security_group_id = oci_core_network_security_group.nsg.id
-  direction                 = "INGRESS"
-  protocol                  = "6"
-  source_type               = "CIDR_BLOCK"
-  source                    = "0.0.0.0/0"
-
-  tcp_options {
-    destination_port_range {
-      min = 8080
-      max = 8080
-    }
-  }
-
-  description = "Allow Jenkins on 8080 Port"
 }
