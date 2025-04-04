@@ -17,10 +17,18 @@ pipeline {
   }
 
   stages {
+    stage('Clean Workspace') {
+      steps {
+        script {
+          echo '🧹 Cleaning up workspace before build...'
+          deleteDir()
+        }
+      }
+    }
+
     stage('Set Image Tag') {
       steps {
         script {
-          // Uses Jenkins-provided env var instead of 'git rev-parse'
           def tag = env.GIT_COMMIT.take(7)
           writeFile file: 'image_tag.txt', text: tag
         }
