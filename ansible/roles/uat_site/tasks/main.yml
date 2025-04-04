@@ -1,16 +1,19 @@
 ---
 # UAT Site Deployment Entry Point
 
+# Step 1: Ensure Docker is installed on the UAT host
 - name: Ensure Docker is installed on UAT
   ansible.builtin.include_role:
-    name: docker
+    name: "{{ docker_role | default('docker') }}"
 
+# Step 2: Check Docker client info to verify OCIR login
 - name: Check if already logged into OCIR
   ansible.builtin.command: docker info
   register: docker_info_check
   failed_when: false
   changed_when: false
 
+# Step 3: Perform docker login to OCIR (only if not already logged in)
 - name: Login to OCIR (if not already logged in)
   ansible.builtin.command:
     cmd: >
@@ -21,12 +24,14 @@
   no_log: true
   changed_when: false
 
+# Step 4: Stop and remove any previously running UAT container
 - name: Stop and remove existing UAT site container (if any)
   community.docker.docker_container:
     name: "{{ uat_site_container }}"
     state: absent
     force_kill: true
 
+# Step 5: Try to pull the latest UAT site image from OCIR
 - name: Attempt to pull UAT site image from OCIR
   community.docker.docker_image:
     name: "{{ uat_site_image }}"
@@ -35,6 +40,7 @@
   ignore_errors: true
   failed_when: false
 
+# Step 6: Check if image exists locally
 - name: Check if image exists locally
   community.docker.docker_image_info:
     name: "{{ uat_site_image }}"
@@ -42,18 +48,41 @@
   failed_when: false
   changed_when: false
 
+# Step 7: Set internal flag if image is available
 - name: Set fact if image is available
   ansible.builtin.set_fact:
     uat_image_available: "{{ uat_local_image_info.images | length > 0 }}"
 
+# Step 8: Show image decision in debug
 - name: Debug image pull result
   ansible.builtin.debug:
     msg: "Image pulled: {{ uat_image_pull.changed }}, Local image found: {{ uat_image_available }}"
 
+# Step 9a: Set fallback values before rendering
+- name: Set fallback template variables
+  ansible.builtin.set_fact:
+    fallback_color: blue
+    fallback_jenkins_domain: "{{ jenkins_domain }}"
+  when: not uat_image_available | default(false)
+  tags: fallback
+
+# Step 9b: Render fallback HTML from template if image is not available
+- name: Render UAT fallback index.html from template
+  ansible.builtin.template:
+    src: files/uat-fallback-index.html.j2
+    dest: /home/devops/uat-fallback-index.html
+    owner: devops
+    group: devops
+    mode: '0644'
+  when: not uat_image_available | default(false)
+  tags: fallback
+
+# Step 10: Deploy real container if image is available
 - name: Include task to run real app if image is available
   ansible.builtin.import_tasks: run-real.yml
   when: uat_image_available | default(false)
 
+# Step 11: Run fallback if image is not available
 - name: Include fallback cleanup tasks
   ansible.builtin.import_tasks: cleanup.yml
   when: not (uat_image_available | default(false))

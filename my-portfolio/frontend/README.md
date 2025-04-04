@@ -11,10 +11,12 @@
 
 ## Demo
 
-🔗 [Visit Live Site (PROD)](https://oci.prod.pauloazedo.dev)  
-🔗 [Visit UAT](https://oci.uat.pauloazedo.dev)
+🔗 [Live Site (PROD @ OCI)](https://oci.prod.pauloazedo.dev)  
+🔗 [UAT @ OCI](https://oci.uat.pauloazedo.dev)  
+🔗 [Jenkins Dashboard](https://oci.jenkins.pauloazedo.dev)
 
-![Portfolio Screenshot](https://yourdomain.com/path-to-screenshot.jpg)
+> Each cloud provider uses its own subdomain prefix:  
+> `oci.`, `aws.`, `azure.`, `gcp.` – for fully isolated stacks.
 
 ---
 
@@ -22,38 +24,47 @@
 
 - **Framework**: Next.js 14
 - **Language**: TypeScript
-- **Styling**: Tailwind CSS
+- **Styling**: Tailwind CSS v4
 - **Icons**: React Icons + Custom SVGs
-- **Build Tooling**: ESLint, Prettier
-- **Deployment**: Docker + NGINX (via Jenkins)
+- **Tooling**: ESLint, Prettier
+- **Infrastructure**: OCI, AWS, GCP, Azure
+- **Orchestration**: Ansible + Terraform
+- **CI/CD**: Jenkins (agentless, Dockerized)
+- **Certificates**: Let's Encrypt + Certbot (auto-renewal)
+- **Monitoring**: Slack notifications for cert renewals
 
 ---
 
 ## Project Structure
 
-```
-frontend/
-├── public/                 # Static assets, cert logos, resume, etc.
-├── src/
-│   ├── components/         # AboutMe, Certifications, Education, etc.
-│   ├── data/               # Certifications (Credly), timeline entries
-│   ├── pages/              # Next.js pages (_app, index, api/hello)
-│   └── styles/             # Tailwind globals
-├── next.config.ts
-├── tailwind.config.js
-├── package.json
-└── tsconfig.json
-```
+\`\`\`
+my-portfolio/
+├── frontend/          # This React SPA
+├── terraform/         # Multi-provider infra-as-code
+│   ├── oci/           # OCI-specific infra (DNS, compute)
+│   ├── aws/
+│   ├── azure/
+│   └── gcp/
+└── ansible/           # Server config, app deploy, CI/CD
+    ├── inventory/
+    │   ├── aws.ini
+    │   ├── oci.ini
+    │   └── ...
+    └── roles/
+        ├── cloud_volume_oci/
+        ├── nginx/
+        └── jenkins/
+\`\`\`
 
 ---
 
 ## Local Development
 
-```bash
+\`\`\`bash
 cd my-portfolio/frontend
 npm install
 npm run dev
-```
+\`\`\`
 
 Then visit: `http://localhost:3000`
 
@@ -61,9 +72,9 @@ Then visit: `http://localhost:3000`
 
 ## Build for Production
 
-```bash
+\`\`\`bash
 npm run build
-```
+\`\`\`
 
 Used in Jenkins for container image generation. Output goes to `.next/`.
 

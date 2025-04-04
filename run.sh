@@ -28,7 +28,7 @@ if [[ ! " ${SUPPORTED_PROVIDERS[*]} " =~ " ${CLOUD_PROVIDER} " ]]; then
 fi
 
 TF_DIR="terraform/$CLOUD_PROVIDER"
-ANSIBLE_INVENTORY="ansible/inventory/hosts"
+ANSIBLE_INVENTORY="ansible/inventory/${CLOUD_PROVIDER}.ini"
 UAT_PLAYBOOK="ansible/uat.yml"
 PROD_PLAYBOOK="ansible/prod.yml"
 

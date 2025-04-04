@@ -1,40 +1,5 @@
 # ansible/group_vars/all.yml
 # Global non-sensitive variables for all hosts
 
-############################################################
-# Jenkins Configuration
-############################################################
-
-jenkins_http_port: 8080
-
-jenkins_plugins_txt: /home/devops/jenkins_data/plugins.txt
-jenkins_init_dir: /home/devops/jenkins_data/init
-jenkins_config_dir: /home/devops/jenkins_config
-
-# Provider that will host the www.pauloazedo.dev domain
+# This provider is responsible for the shared domain www.pauloazedo.dev
 default_provider: "oci"
-
-jenkins_plugins:
-  - workflow-aggregator
-  - git
-  - blueocean
-  - credentials
-  - pipeline-utility-steps
-  - matrix-auth
-  - configuration-as-code
-  - github
-  - github-api
-  - github-branch-source
-  - folders
-  - matrix-project
-  - plain-credentials
-  - snakeyaml-api
-  - plugin-util-api
-  - caffeine-api
-  - okhttp-api
-  - joda-time-api
-  - commons-lang3-api
-  - asm-api
-  - pipeline-groovy
-  - pipeline-job
-  - pipeline-graph-analysis

@@ -1,6 +1,6 @@
 server {
     listen 80;
-    server_name oci.jenkins.pauloazedo.dev;
+    server_name {{ jenkins_domain }};
 
     location / {
         return 200 'Jenkins temporary HTTP config for certificate validation.';

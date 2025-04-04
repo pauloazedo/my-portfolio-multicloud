@@ -12,22 +12,6 @@ jenkins_agent_port: 50000
 # Jenkins data volume
 jenkins_data_dir: /home/devops/jenkins_data
 
-# Jenkins plugin list (defined in group_vars in real usage)
-jenkins_plugins: []
-
-# Jenkins plugin checksum file
-jenkins_plugins_checksum_path: "{{ jenkins_data_dir }}/.plugins-installed.checksum"
-
-# Jenkins plugins file path (rendered from template)
-jenkins_plugins_txt: "{{ jenkins_data_dir }}/plugins.txt"
-
-# Init script directory
-jenkins_init_dir: "{{ jenkins_data_dir }}/init.groovy.d"
-
-# Init script filename
-jenkins_init_script: "01-admin-user.groovy"
-jenkins_init_dest_path: "{{ jenkins_init_dir }}/{{ jenkins_init_script }}"
-
 # Jenkins container name
 jenkins_container_name: jenkins
 

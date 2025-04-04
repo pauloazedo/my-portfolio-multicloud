@@ -1,6 +1,9 @@
+# ansible/roles/nginx/templates/jenkins-http.conf.j2
+# HTTP config for Jenkins (used temporarily before TLS cert issuance)
+
 server {
     listen 80;
-    server_name oci.jenkins.pauloazedo.dev;
+    server_name {{ jenkins_domain }};
 
     location /.well-known/acme-challenge/ {
         root /var/www/html;

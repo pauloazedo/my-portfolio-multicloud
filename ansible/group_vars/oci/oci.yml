@@ -1,41 +1,40 @@
-# ansible/group_vars/oci.yml
-# OCI-specific variables and role mappings
+# ansible/group_vars/oci/oci.yml
+# OCI-specific configuration
 
 ############################################################
-# Cloud Provider Identity
-############################################################
-cloud_provider: "oci"
-
-############################################################
-# OCI Registry Namespace
+# OCI Registry (OCIR)
 ############################################################
 ocir_namespace: "idtijq8cx4jl"
+ocir_user: "idtijq8cx4jl/devops.user"
 
 ############################################################
-# Dynamic Role Paths (for OS-sensitive logic)
-# These allow uat.yml/prod.yml to use provider-specific roles
+# DNS Domains for OCI deployment
 ############################################################
-bootstrap_role: "cloud/oci/bootstrap"
-common_role: "cloud/oci/common"
-docker_role: "cloud/oci/docker"
-hardening_role: "cloud/oci/hardening"
-ssh_access_role: "cloud/oci/ssh_access"
-jenkins_volume_role: "cloud/oci/jenkins_volume"
+jenkins_domain: "oci.jenkins.pauloazedo.dev"
+uat_domain: "oci.uat.pauloazedo.dev"
+prod_domain: "oci.prod.pauloazedo.dev"
+
+############################################################
+# Jenkins Volume Role for OCI
+############################################################
+jenkins_volume_role: "cloud/oci/volume"
 
 ############################################################
 # UAT Site Configuration
 ############################################################
-uat_site_image: "iad.ocir.io/{{ ocir_namespace }}/uat-site:latest"
+uat_site_ocir_repo: "iad.ocir.io/{{ ocir_namespace }}/uat-site"
+uat_site_image: "{{ uat_site_ocir_repo }}:{{ uat_site_image_tag | default('latest') }}"
 uat_site_waiting_image: "iad.ocir.io/{{ ocir_namespace }}/uat-waiting:latest"
 uat_site_container: "uat-site"
 uat_site_port: 3000
+
+# Build metadata
 uat_site_git_repo: "https://github.com/pauloazedo/my-portfolio-oci-devops.git"
 uat_site_git_branch: "uat"
 uat_site_dockerfile_path: "my-portfolio/frontend"
-uat_site_image_tag: "{{ lookup('pipe', 'git rev-parse --short HEAD') }}"
 
 ############################################################
-# PROD Site Configuration (Blue/Green Deployment)
+# PROD Site Configuration (Blue/Green)
 ############################################################
 prod_site_green_image: "iad.ocir.io/{{ ocir_namespace }}/prod-site:green"
 prod_site_green_container: "prod-site-green"
@@ -45,4 +44,10 @@ prod_site_blue_image: "iad.ocir.io/{{ ocir_namespace }}/prod-site:blue"
 prod_site_blue_container: "prod-site-blue"
 prod_site_blue_port: 3200
 
+# Fallback image
 prod_site_waiting_image: "iad.ocir.io/{{ ocir_namespace }}/prod-waiting:latest"
+
+############################################################
+# Slack Notifications
+############################################################
+slack_cert_renewal_webhook: "https://hooks.slack.com/services/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"

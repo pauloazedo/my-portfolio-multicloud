@@ -1,8 +1,9 @@
+<!-- ansible/files/uat-fallback-index.html.j2 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>PROD Site – Waiting</title>
+    <title>UAT Site – Waiting</title>
     <style>
         body {
             background-color: #0f172a;
@@ -27,24 +28,23 @@
             color: #94a3b8;
         }
         a.highlight {
-            color: #fbbf24;
+            color: #38bdf8;
             font-weight: bold;
             text-decoration: none;
         }
         a.highlight:hover {
             text-decoration: underline;
         }
-        .color-label {
-            font-weight: 900;
-            font-size: 1.3rem;
-        }
     </style>
 </head>
 <body>
-    <h1>PROD Environment Ready (<span class="color-label" style="color: $FALLBACK_COLOR;">$FALLBACK_COLOR</span>)</h1>
-    <p>Waiting for <a class="highlight" href="https://oci.jenkins.pauloazedo.dev" target="_blank" rel="noopener noreferrer">Jenkins</a>
-       to promote and deploy the latest
-       <span class="color-label" style="color: $FALLBACK_COLOR;">$FALLBACK_COLOR</span> release.
+    <h1>UAT Environment Ready (<span>{{ fallback_color }}</span>)</h1>
+    <p>
+        Waiting for
+        <a class="highlight" href="https://{{ fallback_jenkins_domain }}" target="_blank" rel="noopener noreferrer">
+            Jenkins
+        </a>
+        to publish the latest <strong>{{ fallback_color }}</strong> image through the pipeline.
     </p>
 </body>
 </html>
