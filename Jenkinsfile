@@ -17,11 +17,10 @@ pipeline {
   }
 
   stages {
-
     stage('Set Image Tag') {
       steps {
         script {
-          // env.GIT_COMMIT is injected by Jenkins Git plugin when using SCM mode
+          // Uses Jenkins-provided env var instead of 'git rev-parse'
           def tag = env.GIT_COMMIT.take(7)
           writeFile file: 'image_tag.txt', text: tag
         }
