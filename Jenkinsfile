@@ -12,24 +12,16 @@ pipeline {
   }
 
   options {
-    skipDefaultCheckout(true) // avoid automatic checkout to prevent .git issues
     timestamps()
     ansiColor('xterm')
   }
 
   stages {
-    stage('Checkout Code') {
-      steps {
-        git branch: 'uat',
-            credentialsId: 'github-credentials',
-            url: 'https://github.com/pauloazedo/my-portfolio-oci-devops.git'
-      }
-    }
-
     stage('Set Image Tag') {
       steps {
         script {
-          def tag = sh(script: "git rev-parse --short HEAD", returnStdout: true).trim()
+          // Use Jenkins env var or fallback if undefined
+          def tag = env.GIT_COMMIT ? env.GIT_COMMIT.take(7) : sh(script: "git rev-parse --short HEAD", returnStdout: true).trim()
           writeFile file: 'image_tag.txt', text: tag
         }
       }
@@ -84,9 +76,7 @@ pipeline {
       echo "❌ Deployment failed for ${params.CLOUD_PROVIDER}"
     }
     always {
-      node {
-        sh 'rm -f /var/jenkins_home/.jenkins_self_deploy || true'
-      }
+      sh 'rm -f /var/jenkins_home/.jenkins_self_deploy || true'
     }
   }
 }
