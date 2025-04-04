@@ -1,0 +1,21 @@
+---
+# ansible/roles/uat_site/tasks/run-fallback.yml
+# Build and run fallback container
+
+- name: Build UAT fallback image
+  community.docker.docker_image:
+    name: "{{ uat_site_fallback_image }}"
+    tag: latest
+    source: build
+    build:
+      path: "{{ uat_site_fallback_build_dir }}"
+  register: fallback_build_result
+
+- name: Run fallback UAT site container
+  community.docker.docker_container:
+    name: "{{ uat_site_container }}"
+    image: "{{ uat_site_fallback_image }}:latest"
+    restart_policy: unless-stopped
+    state: started
+    published_ports:
+      - "3000:3000"

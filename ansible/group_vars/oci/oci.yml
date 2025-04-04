@@ -1,29 +1,42 @@
+# ansible/group_vars/oci/oci.yml
 # OCI-specific configuration
 
 ############################################################
-# OCI Registry (OCIR)
+# Role Mappings for OCI (used in oci playbooks)
 ############################################################
-ocir_namespace: "idtijq8cx4jl"
-ocir_user: "idtijq8cx4jl/devops.user"
+bootstrap_role: bootstrap
+common_role: common
+hardening_role: hardening
+docker_role: docker
+ssh_access_role: ssh_access
+jenkins_volume_role: jenkins_volume
 
 ############################################################
-# DNS Domains for OCI deployment
+# OCI Container Registry (OCIR)
+############################################################
+ocir_namespace: "idtijq8cx4jl"
+
+############################################################
+# DNS Configuration (per environment)
 ############################################################
 jenkins_domain: "oci.jenkins.pauloazedo.dev"
 uat_domain: "oci.uat.pauloazedo.dev"
 prod_domain: "oci.prod.pauloazedo.dev"
 
-############################################################
-# Define Full FQDN Variables
-############################################################
+# Full FQDNs (in case you need to override for multi-cloud)
 jenkins_fqdn: "{{ jenkins_domain }}"
 uat_fqdn: "{{ uat_domain }}"
 prod_fqdn: "{{ prod_domain }}"
 
 ############################################################
-# Jenkins Volume Role for OCI
+# Jenkins Persistent Volume Configuration
 ############################################################
-jenkins_volume_role: "cloud/oci/jenkins_volume"
+jenkins_data_dir: "/mnt/jenkins_data"
+
+# Volume mount inside instance (used by jenkins_volume role)
+cloud_volume_device: "/dev/sdb"
+cloud_volume_mount_point: "/home/devops/jenkins_data"
+cloud_volume_filesystem_type: "ext4"
 
 ############################################################
 # UAT Site Configuration
@@ -34,13 +47,19 @@ uat_site_waiting_image: "iad.ocir.io/{{ ocir_namespace }}/uat-waiting:latest"
 uat_site_container: "uat-site"
 uat_site_port: 3000
 
-# Build metadata
+# Git metadata for building the UAT site image
 uat_site_git_repo: "https://github.com/pauloazedo/my-portfolio-oci-devops.git"
 uat_site_git_branch: "uat"
 uat_site_dockerfile_path: "my-portfolio/frontend"
 
 ############################################################
-# PROD Site Configuration (Blue/Green)
+# UAT Fallback Build (Local Build + Push)
+############################################################
+uat_site_fallback_image: "iad.ocir.io/{{ ocir_namespace }}/uat-waiting:latest"
+uat_site_fallback_build_dir: "/home/devops/uat-fallback"
+
+############################################################
+# PROD Site Configuration (Blue/Green Deployments)
 ############################################################
 prod_site_green_image: "iad.ocir.io/{{ ocir_namespace }}/prod-site:green"
 prod_site_green_container: "prod-site-green"
@@ -50,13 +69,10 @@ prod_site_blue_image: "iad.ocir.io/{{ ocir_namespace }}/prod-site:blue"
 prod_site_blue_container: "prod-site-blue"
 prod_site_blue_port: 3200
 
-# Fallback image
+# Fallback container image
 prod_site_waiting_image: "iad.ocir.io/{{ ocir_namespace }}/prod-waiting:latest"
 
 ############################################################
-# Slack Notifications
+# Slack Integrations
 ############################################################
 slack_cert_renewal_webhook: "https://hooks.slack.com/services/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"
-
-# Jenkins Data Directory
-jenkins_data_dir: "/mnt/jenkins_data"   # Now defined here for OCI

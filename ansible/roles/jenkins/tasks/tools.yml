@@ -14,12 +14,3 @@
         /home/jenkins/venv/bin/pip install --upgrade pip &&
         /home/jenkins/venv/bin/pip install ansible oci
       "
-
-- name: Approve SSH host key inside Jenkins container
-  community.docker.docker_container_exec:
-    container: "{{ jenkins_container_name }}"
-    command: >
-      bash -c "rm -f /var/jenkins_home/.ssh/known_hosts &&
-               mkdir -p /var/jenkins_home/.ssh &&
-               ssh-keyscan -H {{ uat_fqdn }} >> /var/jenkins_home/.ssh/known_hosts &&
-               chmod 644 /var/jenkins_home/.ssh/known_hosts"

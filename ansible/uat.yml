@@ -1,21 +1,26 @@
-# UAT Infrastructure and Application Deployment
-
-# Step 1: Setup base infrastructure (UAT)
-- name: Setup base infrastructure (UAT)
+---
+- name: UAT - Full Infrastructure and App Deployment
   hosts: uat
   become: true
-  vars:
-    bootstrap_role: "cloud/oci/bootstrap"  # Full path to bootstrap role
-    common_role: "cloud/oci/common"       # Full path to common role
-    hardening_role: "cloud/oci/hardening" # Full path to hardening role
-    docker_role: "cloud/oci/docker"       # Full path to docker role
-    ssh_access_role: "cloud/oci/ssh_access" # Full path to ssh_access role
-    jenkins_volume_role: "cloud/oci/jenkins_volume" # Full path to Jenkins volume role
+
   vars_files:
-    - group_vars/all.yml
-    - group_vars/all.secrets.yml
-    - group_vars/{{ cloud_provider }}/{{ cloud_provider }}.yml
-    - group_vars/{{ cloud_provider }}/{{ cloud_provider }}.secrets.yml
+    - "group_vars/all.yml"
+    - "group_vars/all.secrets.yml"
+
+  pre_tasks:
+    - name: Set cloud provider (manually or detect via hostname/group)
+      ansible.builtin.set_fact:
+        cloud_provider: "oci"
+
+    - name: Include cloud-specific vars
+      ansible.builtin.include_vars:
+        file: "group_vars/{{ cloud_provider }}/{{ cloud_provider }}.yml"
+
+    - name: Include cloud-specific secrets
+      ansible.builtin.include_vars:
+        file: "group_vars/{{ cloud_provider }}/{{ cloud_provider }}.secrets.yml"
+        name: cloud_secrets  # optional namespace
+
   tasks:
     - name: Include bootstrap role
       ansible.builtin.include_role:
@@ -37,38 +42,27 @@
         name: "{{ docker_role }}"
       tags: docker
 
+    - name: Include nginx role
+      ansible.builtin.include_role:
+        name: nginx
+      tags: nginx
+
     - name: Include SSH access role
       ansible.builtin.include_role:
         name: "{{ ssh_access_role }}"
       tags: set_ssh_access
 
-    - name: Include Jenkins volume role from provider definition
+    - name: Include Jenkins volume mount role
       ansible.builtin.include_role:
         name: "{{ jenkins_volume_role }}"
       tags: jenkins_volume
 
-# Step 2: Mount Jenkins block volume (provider-specific)
-- name: Attach and mount Jenkins block volume
-  hosts: uat
-  become: true
-  tasks:
-    - name: Include Jenkins volume role from provider definition
+    - name: Include Jenkins role
       ansible.builtin.include_role:
-        name: "{{ jenkins_volume_role }}"
-      tags: jenkins_volume
+        name: jenkins
+      tags: jenkins
 
-# Step 3: Setup Jenkins
-- name: Setup Jenkins
-  hosts: uat
-  become: true
-  roles:
-    - role: jenkins
-      tags: jenkins_setup
-
-# Step 4: Deploy UAT web container
-- name: Deploy UAT web container
-  hosts: uat
-  become: true
-  roles:
-    - role: uat_site
+    - name: Deploy UAT site container
+      ansible.builtin.include_role:
+        name: uat_site
       tags: uat_site
