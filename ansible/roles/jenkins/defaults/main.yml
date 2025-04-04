@@ -1,18 +1,21 @@
-# Default values for Jenkins role
+# ansible/roles/jenkins/defaults/main.yml
+# ------------------------------------------------------------------------------
+# Default values for Jenkins role (can be overridden via group_vars or extra vars)
+# ------------------------------------------------------------------------------
 
-# Jenkins Docker image
-jenkins_image: jenkins/jenkins
-jenkins_image_tag: lts
-
-# Jenkins ports
-jenkins_http_port: 8080
-jenkins_agent_port: 50000
-
-# Jenkins data volume (fallback if not defined in group_vars)
-jenkins_data_dir: "/home/devops/jenkins_data"  # Default if not overridden
+# Docker image to use for Jenkins
+jenkins_image: "jenkins/jenkins"
+jenkins_image_tag: "lts-jdk21"  # Explicit version tag for reproducibility
 
 # Jenkins container name
-jenkins_container_name: jenkins
+jenkins_container_name: "jenkins"
 
-# Jenkins healthcheck path
+# Jenkins ports mapping
+jenkins_http_port: 8080       # Port for Jenkins web UI
+jenkins_agent_port: 50000     # Port for Jenkins agents (JNLP)
+
+# Jenkins persistent data volume
+jenkins_data_dir: "/home/devops/jenkins_data"
+
+# Jenkins healthcheck URL
 jenkins_healthcheck_url: "http://localhost:{{ jenkins_http_port }}/login"

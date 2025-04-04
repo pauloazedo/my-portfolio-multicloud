@@ -8,18 +8,22 @@
     - "group_vars/all.secrets.yml"
 
   pre_tasks:
-    - name: Set cloud provider (manually or detect via hostname/group)
+    - name: Set cloud provider (only if undefined)
       ansible.builtin.set_fact:
         cloud_provider: "oci"
+      when: cloud_provider is not defined
+      tags: always
 
     - name: Include cloud-specific vars
       ansible.builtin.include_vars:
         file: "group_vars/{{ cloud_provider }}/{{ cloud_provider }}.yml"
+      tags: always
 
     - name: Include cloud-specific secrets
       ansible.builtin.include_vars:
         file: "group_vars/{{ cloud_provider }}/{{ cloud_provider }}.secrets.yml"
-        name: cloud_secrets  # optional namespace
+        name: cloud_secrets
+      tags: always
 
   tasks:
     - name: Include bootstrap role
@@ -55,7 +59,9 @@
     - name: Include Jenkins volume mount role
       ansible.builtin.include_role:
         name: "{{ jenkins_volume_role }}"
-      tags: jenkins_volume
+      tags:
+        - jenkins
+        - jenkins_volume
 
     - name: Include Jenkins role
       ansible.builtin.include_role:

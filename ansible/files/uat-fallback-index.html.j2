@@ -28,7 +28,7 @@
             color: #94a3b8;
         }
         a.highlight {
-            color: #38bdf8;
+            color: #f97316; /* Tailwind's orange-500 */
             font-weight: bold;
             text-decoration: none;
         }
@@ -38,13 +38,13 @@
     </style>
 </head>
 <body>
-    <h1>UAT Environment Ready (<span>{{ fallback_color }}</span>)</h1>
+    <h1>UAT Environment Ready 🚀</h1>
     <p>
         Waiting for
         <a class="highlight" href="https://{{ fallback_jenkins_domain }}" target="_blank" rel="noopener noreferrer">
             Jenkins
         </a>
-        to publish the latest <strong>{{ fallback_color }}</strong> image through the pipeline.
+        to deploy the latest UAT application through the pipeline 🛠️
     </p>
 </body>
 </html>

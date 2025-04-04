@@ -33,8 +33,9 @@
     opts: defaults
     state: present
 
-- name: Force re-ownership of mounted volume (UID 1000 for Jenkins)
+- name: Set ownership of mounted volume to UID 1000 for Jenkins
   ansible.builtin.command: chown -R 1000:1000 {{ cloud_volume_mount_point }}
   become: true
-  register: chown_result
-  changed_when: chown_result.rc == 0
+  register: jenkins_chown
+  changed_when: jenkins_chown.rc == 0
+  tags: jenkins_volume

@@ -1,3 +1,4 @@
+<!-- ansible/files/prod-fallback-index.html.j2 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -27,7 +28,7 @@
             color: #94a3b8;
         }
         a.highlight {
-            color: #fbbf24;
+            color: #f97316; /* Tailwind orange-500 */
             font-weight: bold;
             text-decoration: none;
         }
@@ -41,10 +42,17 @@
     </style>
 </head>
 <body>
-    <h1>PROD Environment Ready (<span class="color-label" style="color: {{ fallback_color }};">{{ fallback_color }}</span>)</h1>
-    <p>Waiting for <a class="highlight" href="https://{{ jenkins_domain }}" target="_blank" rel="noopener noreferrer">Jenkins</a>
-       to promote and deploy the latest
-       <span class="color-label" style="color: {{ fallback_color }};">{{ fallback_color }}</span> release.
+    <h1>
+        PROD Environment Ready
+        <span class="color-label" style="color: {{ fallback_color }};">({{ fallback_color }})</span> ✅
+    </h1>
+    <p>
+        Waiting for
+        <a class="highlight" href="https://{{ jenkins_domain }}" target="_blank" rel="noopener noreferrer">
+            Jenkins
+        </a>
+        to promote and deploy the latest
+        <span class="color-label" style="color: {{ fallback_color }};">{{ fallback_color }}</span> release via pipeline 🚀
     </p>
 </body>
 </html>

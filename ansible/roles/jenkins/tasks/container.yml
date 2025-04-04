@@ -1,22 +1,32 @@
 ---
 # ansible/roles/jenkins/tasks/container.yml
-# Start Jenkins container using persistent /var/jenkins_home and SSH access
+# Create Jenkins container if missing or broken
 
 - name: Check if Jenkins container exists
   community.docker.docker_container_info:
-    name: jenkins
+    name: "{{ jenkins_container_name }}"
   register: jenkins_status
   ignore_errors: true
+  tags:
+    - jenkins
+    - jenkins_container
 
-- name: Run Jenkins container with persistent volume and SSH access
+- name: Debug Jenkins container status (for troubleshooting)
+  ansible.builtin.debug:
+    var: jenkins_status
+  tags:
+    - jenkins
+    - jenkins_container
+
+- name: Create Jenkins container if not present or not running
   community.docker.docker_container:
-    name: jenkins
-    image: jenkins/jenkins:lts-jdk21
+    name: "{{ jenkins_container_name }}"
+    image: "{{ jenkins_image }}:{{ jenkins_image_tag }}"
     state: started
     restart_policy: always
     published_ports:
-      - "8080:8080"
-      - "50000:50000"
+      - "{{ jenkins_http_port }}:8080"
+      - "{{ jenkins_agent_port }}:50000"
     volumes:
       - "{{ jenkins_data_dir }}:/var/jenkins_home"
       - "/home/devops/.ssh:/var/jenkins_home/.ssh:ro"
@@ -30,4 +40,8 @@
   when: >
     jenkins_status.container is not defined
     or jenkins_status.container is none
+    or jenkins_status.container.State is not defined
     or jenkins_status.container.State.Status != 'running'
+  tags:
+    - jenkins
+    - jenkins_container

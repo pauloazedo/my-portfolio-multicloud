@@ -31,7 +31,7 @@ prod_fqdn: "{{ prod_domain }}"
 ############################################################
 # Jenkins Persistent Volume Configuration
 ############################################################
-jenkins_data_dir: "/mnt/jenkins_data"
+jenkins_data_dir: "/home/devops/jenkins_data"
 
 # Volume mount inside instance (used by jenkins_volume role)
 cloud_volume_device: "/dev/sdb"
