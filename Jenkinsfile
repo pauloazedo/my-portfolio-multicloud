@@ -12,24 +12,24 @@ pipeline {
   }
 
   options {
+    skipDefaultCheckout(true) // avoid automatic checkout to prevent .git issues
     timestamps()
     ansiColor('xterm')
   }
 
   stages {
-    stage('Clean Workspace') {
+    stage('Checkout Code') {
       steps {
-        script {
-          echo '🧹 Cleaning up workspace before build...'
-          deleteDir()
-        }
+        git branch: 'uat',
+            credentialsId: 'github-credentials',
+            url: 'https://github.com/pauloazedo/my-portfolio-oci-devops.git'
       }
     }
 
     stage('Set Image Tag') {
       steps {
         script {
-          def tag = env.GIT_COMMIT.take(7)
+          def tag = sh(script: "git rev-parse --short HEAD", returnStdout: true).trim()
           writeFile file: 'image_tag.txt', text: tag
         }
       }
@@ -84,7 +84,9 @@ pipeline {
       echo "❌ Deployment failed for ${params.CLOUD_PROVIDER}"
     }
     always {
-      sh 'rm -f /var/jenkins_home/.jenkins_self_deploy || true'
+      node {
+        sh 'rm -f /var/jenkins_home/.jenkins_self_deploy || true'
+      }
     }
   }
 }
