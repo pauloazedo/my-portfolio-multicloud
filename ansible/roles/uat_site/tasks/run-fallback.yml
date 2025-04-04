@@ -1,0 +1,58 @@
+---
+# ansible/roles/uat_site/tasks/run-fallback.yml
+# Build, push, run fallback UAT container, and cleanup stale fallback images
+
+- name: Build UAT fallback image locally
+  community.docker.docker_image:
+    name: uat-waiting-local
+    tag: latest
+    source: build
+    build:
+      path: "{{ uat_site_fallback_build_dir }}"
+  register: fallback_build_result
+  tags: [uat_site, fallback]
+
+- name: Tag and push fallback UAT image to OCIR
+  block:
+    - name: Tag fallback image for OCIR
+      ansible.builtin.command:
+        cmd: docker tag uat-waiting-local:latest {{ uat_site_fallback_image }}
+      changed_when: true
+
+    - name: Push fallback image to OCIR
+      ansible.builtin.command:
+        cmd: docker push {{ uat_site_fallback_image }}
+      register: fallback_push_result
+      changed_when: "'latest' in fallback_push_result.stdout"
+  tags: [uat_site, fallback]
+
+- name: Run fallback UAT site container
+  community.docker.docker_container:
+    name: "{{ uat_site_container }}"
+    image: uat-waiting-local:latest
+    restart_policy: unless-stopped
+    state: started
+    published_ports:
+      - "{{ uat_site_port }}:3000"
+  tags: [uat_site, fallback]
+
+# --- Cleanup older fallback images ---
+
+- name: Remove older fallback Docker images (except latest)
+  ansible.builtin.shell: |
+    set -o pipefail
+    docker images --filter=reference='uat-waiting' \
+      --format '{{ '{{' }}.Repository{{ '}}' }}:{{ '{{' }}.Tag{{ '}}' }} {{ '{{' }}.ID{{ '}}' }}' |
+    grep -v 'uat-waiting:latest' | awk '{print $2}' | xargs -r docker rmi
+  args:
+    executable: /bin/bash
+  register: fallback_cleanup_result
+  changed_when: fallback_cleanup_result.stdout != ""
+  failed_when: false
+  tags: [uat_site, fallback, cleanup]
+
+- name: Show result of fallback cleanup
+  ansible.builtin.debug:
+    msg: "{{ fallback_cleanup_result.stdout_lines | default([]) }}"
+  when: fallback_cleanup_result.stdout_lines is defined
+  tags: [uat_site, fallback, cleanup]

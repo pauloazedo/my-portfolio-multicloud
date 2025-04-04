@@ -1,0 +1,74 @@
+---
+- name: UAT - Full Infrastructure and App Deployment
+  hosts: uat
+  become: true
+
+  vars_files:
+    - "group_vars/all.yml"
+    - "group_vars/all.secrets.yml"
+
+  pre_tasks:
+    - name: Set cloud provider (only if undefined)
+      ansible.builtin.set_fact:
+        cloud_provider: "oci"
+      when: cloud_provider is not defined
+      tags: always
+
+    - name: Include cloud-specific vars
+      ansible.builtin.include_vars:
+        file: "group_vars/{{ cloud_provider }}/{{ cloud_provider }}.yml"
+      tags: always
+
+    - name: Include cloud-specific secrets
+      ansible.builtin.include_vars:
+        file: "group_vars/{{ cloud_provider }}/{{ cloud_provider }}.secrets.yml"
+        name: cloud_secrets
+      tags: always
+
+  tasks:
+    - name: Include bootstrap role
+      ansible.builtin.include_role:
+        name: "{{ bootstrap_role }}"
+      tags: bootstrap
+
+    - name: Include common role
+      ansible.builtin.include_role:
+        name: "{{ common_role }}"
+      tags: common
+
+    - name: Include hardening role
+      ansible.builtin.include_role:
+        name: "{{ hardening_role }}"
+      tags: hardening
+
+    - name: Include docker role
+      ansible.builtin.include_role:
+        name: "{{ docker_role }}"
+      tags: docker
+
+    - name: Include nginx role
+      ansible.builtin.include_role:
+        name: nginx
+      tags: nginx
+
+    - name: Include SSH access role
+      ansible.builtin.include_role:
+        name: "{{ ssh_access_role }}"
+      tags: set_ssh_access
+
+    - name: Include Jenkins volume mount role
+      ansible.builtin.include_role:
+        name: "{{ jenkins_volume_role }}"
+      tags:
+        - jenkins
+        - jenkins_volume
+
+    - name: Include Jenkins role
+      ansible.builtin.include_role:
+        name: jenkins
+      tags: jenkins
+
+    - name: Deploy UAT site container
+      ansible.builtin.include_role:
+        name: uat_site
+      tags: uat_site

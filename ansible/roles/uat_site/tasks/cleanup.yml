@@ -1,19 +1,46 @@
-# ansible/roles/uat_site/tasks/cleanup.yml
 ---
+# ansible/roles/uat_site/tasks/cleanup.yml
+# Cleanup unused fallback Docker images
 
-- name: Cleanup fallback Docker images except the latest
+############################################################
+# Step 1: Remove all but the latest tagged uat-waiting image
+############################################################
+- name: Remove old fallback Docker images (except latest)
   ansible.builtin.shell: |
     set -o pipefail
-    docker images --filter=reference='uat-waiting' --format '{{ '{{' }}.Repository{{ '}}' }}:{{ '{{' }}.Tag{{ '}}' }} {{ '{{' }}.ID{{ '}}' }}' |
+    docker images --filter=reference='uat-waiting' \
+      --format '{{ '{{' }}.Repository{{ '}}' }}:{{ '{{' }}.Tag{{ '}}' }} {{ '{{' }}.ID{{ '}}' }}' |
     grep -v 'uat-waiting:latest' | awk '{print $2}' | xargs -r docker rmi
   args:
     executable: /bin/bash
-  register: cleanup_result
-  changed_when: cleanup_result.stdout != ""
+  register: uat_cleanup_result
+  changed_when: uat_cleanup_result.stdout != ""
   failed_when: false
   when: uat_image_available is defined and not uat_image_available
+  tags: [uat_site, fallback]
 
-- name: Show fallback image cleanup result
+- name: Show cleanup result for older fallback images
   ansible.builtin.debug:
-    msg: "{{ cleanup_result.stdout_lines | default([]) }}"
-  when: cleanup_result.stdout_lines is defined
+    msg: "{{ uat_cleanup_result.stdout_lines | default([]) }}"
+  when: uat_cleanup_result.stdout_lines is defined
+  tags: [uat_site, fallback]
+
+############################################################
+# Step 2: Remove temporary local fallback image (if exists)
+############################################################
+- name: Remove local fallback image used for build
+  community.docker.docker_image:
+    name: uat-waiting-local
+    tag: latest
+    state: absent
+  register: uat_local_fallback_cleanup
+  changed_when: uat_local_fallback_cleanup.changed
+  failed_when: false
+  when: uat_image_available is defined and not uat_image_available
+  tags: [uat_site, fallback]
+
+- name: Show result of local fallback image removal
+  ansible.builtin.debug:
+    msg: "Removed local fallback image 'uat-waiting-local:latest': {{ uat_local_fallback_cleanup.changed }}"
+  when: uat_local_fallback_cleanup is defined
+  tags: [uat_site, fallback]

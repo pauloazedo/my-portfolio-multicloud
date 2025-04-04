@@ -1,9 +1,11 @@
 pipeline {
   agent any
 
+  parameters {
+    choice(name: 'CLOUD_PROVIDER', choices: ['oci', 'aws', 'gcp', 'azure'], description: 'Target cloud provider')
+  }
+
   environment {
-    ANSIBLE_INVENTORY = "ansible/inventory/hosts"
-    OCIR_REPO = "iad.ocir.io/idtijq8cx4jl/uat-site"
     SSH_KEY_PATH = "/var/jenkins_home/.ssh/id_rsa"
     ANSIBLE_REMOTE_USER = "devops"
     JENKINS_MARKER = "/var/jenkins_home/.jenkins_self_deploy"
@@ -12,10 +14,6 @@ pipeline {
   options {
     timestamps()
     ansiColor('xterm')
-  }
-
-  triggers {
-    pollSCM('H/5 * * * *')
   }
 
   stages {
@@ -38,15 +36,14 @@ pipeline {
     stage('Sync frontend code to UAT server') {
       steps {
         script {
-          def imageTag = readFile('image_tag.txt').trim()
-          env.IMAGE_TAG = imageTag
+          def tag = readFile('image_tag.txt').trim()
+          def hostname = "${params.CLOUD_PROVIDER}.uat.pauloazedo.dev"
 
-          sh '''
-            set -e
+          sh """
             rsync -az --delete \
               -e "ssh -i ${SSH_KEY_PATH} -o StrictHostKeyChecking=accept-new" \
-              ./my-portfolio/frontend/ ${ANSIBLE_REMOTE_USER}@oci.uat.pauloazedo.dev:/home/devops/frontend
-          '''
+              ./my-portfolio/frontend/ ${ANSIBLE_REMOTE_USER}@${hostname}:/home/devops/frontend
+          """
         }
       }
     }
@@ -54,29 +51,21 @@ pipeline {
     stage('Trigger Ansible Deployment') {
       steps {
         script {
-          def imageTag = readFile('image_tag.txt').trim()
-          env.IMAGE_TAG = imageTag
+          def tag = readFile('image_tag.txt').trim()
+          def inventory = "ansible/inventory/${params.CLOUD_PROVIDER}.ini"
 
           sh """
-            set -e
-            echo '[INFO] Creating Jenkins self-deployment marker'
             touch ${JENKINS_MARKER}
 
             export ANSIBLE_SSH_ARGS="-i ${SSH_KEY_PATH} -o StrictHostKeyChecking=accept-new"
             export ANSIBLE_REMOTE_USER=${ANSIBLE_REMOTE_USER}
 
-            /home/jenkins/venv/bin/ansible-playbook -i ${ANSIBLE_INVENTORY} ansible/site.yml \
+            /home/jenkins/venv/bin/ansible-playbook -i ${inventory} ansible/uat.yml \
               --limit uat \
               --tags uat_site \
-              --extra-vars "uat_site_custom_image=${OCIR_REPO}:${IMAGE_TAG} \
-                            uat_site_image_tag=${IMAGE_TAG}"
+              --extra-vars "cloud_provider=${params.CLOUD_PROVIDER} \
+                            uat_site_image_tag=${tag}"
           """
-        }
-      }
-
-      post {
-        always {
-          sh 'rm -f /var/jenkins_home/.jenkins_self_deploy || true'
         }
       }
     }
@@ -85,12 +74,15 @@ pipeline {
   post {
     success {
       script {
-        def imageTag = readFile('image_tag.txt').trim()
-        echo "✅ Ansible-driven UAT deployment completed for image: ${env.OCIR_REPO}:${imageTag}"
+        def tag = readFile('image_tag.txt').trim()
+        echo "✅ Deployed ${tag} to ${params.CLOUD_PROVIDER}.uat.pauloazedo.dev"
       }
     }
     failure {
-      echo "❌ Pipeline failed. Check logs"
+      echo "❌ Deployment failed for ${params.CLOUD_PROVIDER}"
+    }
+    always {
+      sh 'rm -f /var/jenkins_home/.jenkins_self_deploy || true'
     }
   }
 }

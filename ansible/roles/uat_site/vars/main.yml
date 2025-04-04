@@ -1,3 +1,0 @@
-# Port and container name for the UAT container
-uat_site_port: 3000
-uat_site_container: "uat_site"

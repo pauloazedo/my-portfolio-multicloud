@@ -1,0 +1,72 @@
+---
+# ansible/roles/uat_site/tasks/run-site.yml
+# Deploy the real UAT site container and clean up any fallback leftovers
+
+- name: Ensure previous UAT site container is removed
+  community.docker.docker_container:
+    name: "{{ uat_site_container }}"
+    state: absent
+    force_kill: true
+  ignore_errors: true
+  register: container_cleanup
+  tags: [uat_site, real]
+
+- name: Log container removal status
+  ansible.builtin.debug:
+    msg: "Removed existing container '{{ uat_site_container }}': {{ container_cleanup.changed }}"
+  tags: [uat_site, real]
+
+- name: Run UAT site container with the correct image and port
+  community.docker.docker_container:
+    name: "{{ uat_site_container }}"
+    image: "{{ uat_site_image }}"
+    restart_policy: always
+    published_ports:
+      - "{{ uat_site_port }}:3000"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    recreate: true
+    state: started
+    pull: false
+  register: uat_container_result
+  tags: [uat_site, real]
+
+- name: Log UAT container result
+  ansible.builtin.debug:
+    var: uat_container_result
+  tags: [uat_site, real]
+
+# --- Cleanup fallback images used in previous fallback mode ---
+
+- name: Remove local fallback image used for waiting mode
+  community.docker.docker_image:
+    name: uat-waiting-local
+    tag: latest
+    state: absent
+  register: fallback_local_removal
+  changed_when: fallback_local_removal.changed
+  failed_when: false
+  tags: [uat_site, cleanup]
+
+- name: Remove older untagged fallback Docker images
+  ansible.builtin.shell: |
+    set -o pipefail
+    docker images --filter=reference='uat-waiting' \
+      --format '{{ '{{' }}.Repository{{ '}}' }}:{{ '{{' }}.Tag{{ '}}' }} {{ '{{' }}.ID{{ '}}' }}' |
+    grep -v 'uat-waiting:latest' | awk '{print $2}' | xargs -r docker rmi
+  args:
+    executable: /bin/bash
+  register: fallback_image_cleanup
+  changed_when: fallback_image_cleanup.stdout != ""
+  failed_when: false
+  tags: [uat_site, cleanup]
+
+- name: Show result of fallback image cleanup
+  ansible.builtin.debug:
+    msg: "{{ fallback_image_cleanup.stdout_lines | default([]) }}"
+  when: fallback_image_cleanup.stdout_lines is defined
+  tags: [uat_site, cleanup]

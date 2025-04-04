@@ -1,0 +1,12 @@
+# defaults/main.yml
+# Role: cloud_volume_oci
+# Default variables used to configure OCI block volume mounting
+
+cloud_volume_device: /dev/sdb
+# Device name of the attached block volume (typically assigned in OCI manually or by Terraform)
+
+cloud_volume_mount_point: /home/devops/jenkins_data
+# Filesystem mount point inside the instance — used for Jenkins persistent data
+
+cloud_volume_filesystem_type: ext4
+# Filesystem to use when formatting the block volume

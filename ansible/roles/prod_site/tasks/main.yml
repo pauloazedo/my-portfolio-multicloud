@@ -60,15 +60,17 @@
   when: not green_image_available and not blue_image_available
   tags: fallback
 
-- name: Copy fallback HTML file to expected Dockerfile path
-  ansible.builtin.copy:
-    src: files/prod-fallback-index.html
+- name: Render fallback HTML with dynamic color and Jenkins domain
+  ansible.builtin.template:
+    src: prod-fallback-index.html.j2
     dest: /home/devops/prod-fallback-index.html
     owner: devops
     group: devops
     mode: '0644'
   when: not green_image_available and not blue_image_available
   tags: fallback
+  vars:
+    fallback_color: green  # or blue depending on context (use loop or duplication if needed)
 
 - name: Build fallback PROD image
   community.docker.docker_image:

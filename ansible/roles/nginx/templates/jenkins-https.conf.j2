@@ -1,6 +1,6 @@
 server {
     listen 80;
-    server_name oci.jenkins.pauloazedo.dev;
+    server_name {{ jenkins_domain }};
 
     # Redirect all HTTP to HTTPS
     return 301 https://$host$request_uri;
@@ -8,10 +8,10 @@ server {
 
 server {
     listen 443 ssl;
-    server_name oci.jenkins.pauloazedo.dev;
+    server_name {{ jenkins_domain }};
 
-    ssl_certificate     /etc/letsencrypt/live/oci.jenkins.pauloazedo.dev/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/oci.jenkins.pauloazedo.dev/privkey.pem;
+    ssl_certificate     /etc/letsencrypt/live/{{ jenkins_domain }}/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/{{ jenkins_domain }}/privkey.pem;
 
     location / {
         proxy_pass http://localhost:8080;

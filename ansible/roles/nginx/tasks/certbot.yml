@@ -5,54 +5,49 @@
 - name: Define domains and templates per environment
   ansible.builtin.set_fact:
     nginx_certbot_domains:
-      - domains: ["oci.jenkins.pauloazedo.dev"]
+      - domains: ["{{ jenkins_fqdn }}"]
         template: "jenkins-https.conf.j2"
         filename: "jenkins.conf"
         group: "uat"
-      - domains: ["oci.uat.pauloazedo.dev"]
+      - domains: ["{{ uat_fqdn }}"]
         template: "uat-https.conf.j2"
         filename: "uat.conf"
         group: "uat"
-      - domains: ["oci.prod.pauloazedo.dev", "www.pauloazedo.dev"]
+      - domains: "{{ [prod_fqdn] + ([prod_fqdn] if cloud_provider == default_provider else []) }}"
         template: "prod-https-bluegreen.conf.j2"
         filename: "prod.conf"
         group: "prod"
 
-# Step 2: Filter domains for this host
-- name: Extract domains for this host only
+# Step 2: Filter domains for the current host
+- name: Filter domains for this host based on group
   ansible.builtin.set_fact:
-    certbot_domains_for_host: >-
-      {{
-        nginx_certbot_domains
-        | selectattr('group', 'in', group_names)
-        | list
-      }}
+    certbot_domains_for_host: "{{ nginx_certbot_domains | selectattr('group', 'in', group_names) | list }}"
 
 # Step 3: Build full list of Certbot paths to delete (if cleanup is forced)
-- name: Build full list of Certbot paths to delete
+- name: Build list of Certbot paths to delete
   ansible.builtin.set_fact:
     certbot_paths_to_cleanup: >-
       {{
         certbot_domains_for_host
         | map(attribute='domains')
         | flatten
-        | map('regex_replace', '^(.*)$', ['live/\1', 'archive/\1', 'renewal/\1.conf'])
+        | map('regex_replace', '^(.*)$', ['live/\\1', 'archive/\\1', 'renewal/\\1.conf'])
         | flatten
         | list
       }}
-  when: certbot_force_clean | default(false) | bool
+  when: certbot_force_clean | default(false)
 
-# Step 4: Remove previous Certbot state (optional safety)
-- name: Clean up previous Certbot state
+# Step 4: Clean up previous Certbot state (optional safety)
+- name: Remove previous Certbot state (if forced)
   ansible.builtin.file:
     path: "/etc/letsencrypt/{{ item }}"
     state: absent
   loop: "{{ certbot_paths_to_cleanup }}"
-  when: certbot_force_clean | default(false) | bool
+  when: certbot_force_clean | default(false)
   tags: certbot
 
-# Step 5: Generate HTTPS certificates
-- name: Generate HTTPS certs with Certbot (SAN support)
+# Step 5: Generate HTTPS certificates (SAN support)
+- name: Generate HTTPS certificates with Certbot
   ansible.builtin.command:
     cmd: >
       certbot certonly --nginx
@@ -75,15 +70,15 @@
   loop: "{{ certbot_domains_for_host }}"
   tags: certbot
 
-# Step 7: Reload NGINX
+# Step 7: Reload NGINX to apply new configuration
 - name: Reload NGINX
   ansible.builtin.service:
     name: nginx
     state: reloaded
   tags: certbot
 
-# Step 8: Send Slack alert
-- name: Send Slack alert for renewed certs
+# Step 8: Send Slack alert for renewed certificates
+- name: Send Slack alert for renewed certificates
   ansible.builtin.shell: >
     bash /home/devops/slack-certbot-alert.sh {{ slack_cert_renewal_webhook }} {{ item.item.domains[0] }}
   args:

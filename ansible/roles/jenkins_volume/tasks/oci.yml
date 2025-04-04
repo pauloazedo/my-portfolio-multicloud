@@ -1,0 +1,41 @@
+# ansible/roles/jenkins_volume/tasks/oci.yml
+
+- name: Ensure mount point directory exists
+  ansible.builtin.file:
+    path: "{{ cloud_volume_mount_point }}"
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+
+- name: Check if block device is already formatted
+  ansible.builtin.command: lsblk -f {{ cloud_volume_device }} --output FSTYPE -n
+  register: fs_check
+  changed_when: false
+
+- name: Format block device with ext4 if not already formatted
+  ansible.builtin.command: mkfs.ext4 {{ cloud_volume_device }}
+  when: fs_check.stdout == ""
+  changed_when: fs_check.stdout == ""
+
+- name: Mount the block device
+  ansible.posix.mount:
+    path: "{{ cloud_volume_mount_point }}"
+    src: "{{ cloud_volume_device }}"
+    fstype: "{{ cloud_volume_filesystem_type }}"
+    state: mounted
+
+- name: Ensure block device is added to /etc/fstab
+  ansible.posix.mount:
+    path: "{{ cloud_volume_mount_point }}"
+    src: "{{ cloud_volume_device }}"
+    fstype: "{{ cloud_volume_filesystem_type }}"
+    opts: defaults
+    state: present
+
+- name: Set ownership of mounted volume to UID 1000 for Jenkins
+  ansible.builtin.command: chown -R 1000:1000 {{ cloud_volume_mount_point }}
+  become: true
+  register: jenkins_chown
+  changed_when: jenkins_chown.rc == 0
+  tags: jenkins_volume

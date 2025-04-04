@@ -1,6 +1,6 @@
 server {
     listen 80;
-    server_name oci.prod.pauloazedo.dev;
+    server_name {{ prod_domain }};
 
     location / {
         proxy_pass http://localhost:3001;
