@@ -10,7 +10,7 @@
     hardening_role: "cloud/oci/hardening" # Full path to hardening role
     docker_role: "cloud/oci/docker"       # Full path to docker role
     ssh_access_role: "cloud/oci/ssh_access" # Full path to ssh_access role
-    jenkins_volume: "cloud/oci/jenkins_volume" # Full path to jenkins_volume role
+    jenkins_volume_role: "cloud/oci/jenkins_volume" # Full path to Jenkins volume role
   vars_files:
     - group_vars/all.yml
     - group_vars/all.secrets.yml
@@ -42,10 +42,10 @@
         name: "{{ ssh_access_role }}"
       tags: set_ssh_access
 
-    - name: Include jenkins_volume role
+    - name: Include Jenkins volume role from provider definition
       ansible.builtin.include_role:
-        name: "{{ jenkins_volume }}"
-      tags: set_jenkins_volume
+        name: "{{ jenkins_volume_role }}"
+      tags: jenkins_volume
 
 # Step 2: Mount Jenkins block volume (provider-specific)
 - name: Attach and mount Jenkins block volume
@@ -54,7 +54,7 @@
   tasks:
     - name: Include Jenkins volume role from provider definition
       ansible.builtin.include_role:
-        name: "{{ jenkins_volume }}"
+        name: "{{ jenkins_volume_role }}"
       tags: jenkins_volume
 
 # Step 3: Setup Jenkins
