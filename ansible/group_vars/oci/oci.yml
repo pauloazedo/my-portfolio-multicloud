@@ -50,4 +50,4 @@ prod_site_waiting_image: "iad.ocir.io/{{ ocir_namespace }}/prod-waiting:latest"
 ############################################################
 # Slack Notifications
 ############################################################
-slack_cert_renewal_webhook: "https://hooks.slack.com/services/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"
+slack_cert_renewal_webhook: "https://hooks.slack.com/services/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"

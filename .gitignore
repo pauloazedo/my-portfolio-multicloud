@@ -1,6 +1,6 @@
-# ---------------------------------------
-# General Dependencies & Package Managers
-# ---------------------------------------
+# -----------------------
+# General Dependencies
+# -----------------------
 **/node_modules/
 **/.pnp
 .pnp.*
@@ -10,9 +10,9 @@
 !.yarn/releases
 !.yarn/versions
 
-# -------------------
-# Build & Artifacts
-# -------------------
+# -----------------------
+# Build Outputs
+# -----------------------
 **/.next/
 **/out/
 **/build/
@@ -20,9 +20,9 @@
 *.tsbuildinfo
 next-env.d.ts
 
-# -------------------
+# -----------------------
 # Logs and Debug Files
-# -------------------
+# -----------------------
 *.log
 *.log.*
 *.retry
@@ -32,34 +32,43 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
-# -------------------
-# Secrets & Environment Variables
-# -------------------
+# -----------------------
+# Secrets and Sensitive Files
+# -----------------------
 *.pem
 .env*
 *.secrets.yml
 *.secrets.yml.*
 ansible-vault.pass
 ansible/.vault_pass
+
+# Ignore all provider-specific secrets
+ansible/group_vars/*/*.secrets.yml
+ansible/group_vars/*/*.secrets.yml.*
+
+# Ignore legacy global secrets
 ansible/group_vars/all.secrets.yml
 ansible/group_vars/all.secrets.yml.*
 
-# -------------------
-# Terraform Files
-# -------------------
+# -----------------------
+# Terraform
+# -----------------------
 *.tfstate
 *.tfstate.backup
 *.tfvars
 .terraform/
 terraform/registry.terraform.io/
 
-# -------------------
+# -----------------------
 # Ansible Inventory
-# -------------------
-inventory/*
-!inventory/hosts.yml
+# -----------------------
+ansible/inventory/*
+!ansible/inventory/README.md
+!ansible/inventory/*.ini
 
-# Optional: ignore generated or dynamic roles
+# -----------------------
+# Optional: Role Output Caches
+# -----------------------
 roles/*/
 !roles/**/tasks/
 !roles/**/defaults/
@@ -69,10 +78,12 @@ roles/*/
 !roles/**/files/
 !roles/**/vars/
 
-# -------------------
-# Vercel & Misc
-# -------------------
+# -----------------------
+# Misc
+# -----------------------
 .vercel/
 .DS_Store
+
+# SSH keys (local/dev only)
 .vscode/ansible/files/id_rsa_jenkins
 ansible/files/id_rsa_jenkins
