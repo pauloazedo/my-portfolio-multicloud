@@ -9,8 +9,7 @@
   ansible.builtin.fail:
     msg: "'cloud_provider' must be set before including this role"
   when: cloud_provider is not defined
-  tags:
-    - always
+  tags: always
 
 #####################################################################
 # Step 1: Ensure Jenkins data directory exists with correct ownership
@@ -45,10 +44,27 @@
     - jenkins_container
 
 #####################################################################
-# Step 3: Install required tools inside Jenkins container
+# Step 3: Include Jenkins tool install logic
 #####################################################################
-- name: Install tools inside Jenkins container
+- name: Include Jenkins tool installation logic
   ansible.builtin.include_tasks: tools.yml
+  when: "'jenkins_tools' in ansible_run_tags or 'jenkins' in ansible_run_tags"
+  tags: always
+
+#####################################################################
+# Step 4: Include Jenkins workspace cleanup logic
+#####################################################################
+- name: Include Jenkins workspace cleanup logic
+  ansible.builtin.include_tasks: cleanup-workspace.yml
   tags:
     - jenkins
-    - jenkins_tools
+    - jenkins_cleanup
+
+#####################################################################
+# Step 5: Create ssh keys and add fingerprints
+#####################################################################
+- name: Create SSH Keys and add fingerprints
+  ansible.builtin.include_tasks: ssh-access.yml
+  tags:
+    - jenkins
+    - jenkins_cleanup

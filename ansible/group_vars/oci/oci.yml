@@ -1,6 +1,8 @@
 # ansible/group_vars/oci/oci.yml
 # OCI-specific configuration
 
+cloud_provider: oci
+
 ############################################################
 # Role Mappings for OCI (used in oci playbooks)
 ############################################################
