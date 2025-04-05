@@ -24,6 +24,7 @@ ocir_namespace: "idtijq8cx4jl"
 jenkins_domain: "oci.jenkins.pauloazedo.dev"
 uat_domain: "oci.uat.pauloazedo.dev"
 prod_domain: "oci.prod.pauloazedo.dev"
+www_domain: "www.pauloazedo.dev"
 
 # Full FQDNs (in case you need to override for multi-cloud)
 jenkins_fqdn: "{{ jenkins_domain }}"
