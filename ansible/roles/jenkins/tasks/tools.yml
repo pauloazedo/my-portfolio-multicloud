@@ -26,8 +26,3 @@
   tags:
     - jenkins
     - jenkins_tools
-
-- name: Show install output
-  ansible.builtin.debug:
-    var: jenkins_tools_install.stdout_lines
-  when: jenkins_tools_install.stdout is defined
