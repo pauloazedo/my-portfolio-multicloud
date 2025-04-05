@@ -29,8 +29,7 @@
       - "{{ jenkins_agent_port }}:50000"
     volumes:
       - "{{ jenkins_data_dir }}:/var/jenkins_home"
-      - "/home/devops/.ssh:/var/jenkins_home/.ssh:ro"
-    user: root
+    user: 1000:1000
     healthcheck:
       test: ["CMD-SHELL", "curl -fs http://localhost:8080/login || exit 1"]
       interval: 30s

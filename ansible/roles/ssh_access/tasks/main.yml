@@ -1,3 +1,0 @@
----
-- name: Include cloud-specific tasks
-  ansible.builtin.include_tasks: "{{ cloud_provider }}.yml"

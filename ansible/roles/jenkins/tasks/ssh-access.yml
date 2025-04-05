@@ -1,0 +1,33 @@
+---
+# Configure SSH access and known_hosts for Jenkins container to connect to target servers
+
+- name: Generate SSH keypair for Jenkins (id_rsa)
+  community.crypto.openssh_keypair:
+    path: "{{ jenkins_data_dir }}/.ssh/id_rsa"
+    type: rsa
+    size: 4096
+    regenerate: never
+    owner: "1000"
+    group: "1000"
+    mode: "0600"
+
+- name: Fetch SSH host keys for UAT and PROD
+  ansible.builtin.shell: >
+    ssh-keyscan -H {{ uat_fqdn }} {{ prod_fqdn }} > "{{ jenkins_data_dir }}/.ssh/known_hosts"
+  args:
+    executable: /bin/bash
+  register: known_hosts_cmd
+  changed_when: true
+  failed_when: known_hosts_cmd.rc != 0
+
+- name: Read Jenkins public key (id_rsa.pub)
+  ansible.builtin.slurp:
+    src: "{{ jenkins_data_dir }}/.ssh/id_rsa.pub"
+  register: jenkins_pub_key
+
+- name: Add Jenkins public key to authorized_keys
+  ansible.posix.authorized_key:
+    user: "{{ ansible_user }}"
+    state: present
+    key: "{{ jenkins_pub_key['content'] | b64decode }}"
+    manage_dir: true

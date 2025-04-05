@@ -13,6 +13,7 @@
   tags: [uat_site, fallback]
 
 - name: Tag and push fallback UAT image to OCIR
+  tags: [uat_site, fallback]
   block:
     - name: Tag fallback image for OCIR
       ansible.builtin.command:
@@ -24,7 +25,6 @@
         cmd: docker push {{ uat_site_fallback_image }}
       register: fallback_push_result
       changed_when: "'latest' in fallback_push_result.stdout"
-  tags: [uat_site, fallback]
 
 - name: Run fallback UAT site container
   community.docker.docker_container:
