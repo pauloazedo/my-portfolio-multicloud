@@ -48,8 +48,9 @@
 #####################################################################
 - name: Include Jenkins tool installation logic
   ansible.builtin.include_tasks: tools.yml
-  when: "'jenkins_tools' in ansible_run_tags or 'jenkins' in ansible_run_tags"
-  tags: always
+  tags:
+    - jenkins
+    - jenkins_tools
 
 #####################################################################
 # Step 4: Include Jenkins workspace cleanup logic

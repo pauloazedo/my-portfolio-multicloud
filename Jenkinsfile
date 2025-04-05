@@ -3,7 +3,7 @@ pipeline {
 
   environment {
     // Path to Ansible inventory file
-    ANSIBLE_INVENTORY     = 'ansible/inventory/hosts'
+    ANSIBLE_INVENTORY     = 'ansible/inventory/oci.ini'
 
     // OCI Container Registry (OCIR) target repo
     OCIR_REPO             = 'iad.ocir.io/idtijq8cx4jl/uat-site'
