@@ -1,23 +1,6 @@
 ---
 # Configure SSH access and known_hosts for Jenkins container to connect to target servers
 
-- name: DEBUG — entered ssh_access/tasks/oci.yml
-  ansible.builtin.debug:
-    msg: "Running ssh_access/tasks/oci.yml on {{ inventory_hostname }}"
-
-- name: Remove old Jenkins .ssh directory
-  ansible.builtin.file:
-    path: "{{ jenkins_data_dir }}/.ssh"
-    state: absent
-
-- name: Create Jenkins .ssh directory with proper permissions
-  ansible.builtin.file:
-    path: "{{ jenkins_data_dir }}/.ssh"
-    state: directory
-    mode: "0700"
-    owner: "1000"
-    group: "1000"
-
 - name: Generate SSH keypair for Jenkins (id_rsa)
   community.crypto.openssh_keypair:
     path: "{{ jenkins_data_dir }}/.ssh/id_rsa"
@@ -36,17 +19,6 @@
   register: known_hosts_cmd
   changed_when: true
   failed_when: known_hosts_cmd.rc != 0
-
-- name: Show known_hosts command output
-  ansible.builtin.debug:
-    var: known_hosts_cmd
-
-- name: Set permissions on known_hosts
-  ansible.builtin.file:
-    path: "{{ jenkins_data_dir }}/.ssh/known_hosts"
-    owner: "1000"
-    group: "1000"
-    mode: "0644"
 
 - name: Read Jenkins public key (id_rsa.pub)
   ansible.builtin.slurp:

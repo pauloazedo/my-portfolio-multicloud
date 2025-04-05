@@ -51,14 +51,6 @@
         name: nginx
       tags: nginx
 
-    - name: Include SSH access role
-      ansible.builtin.include_role:
-        name: "{{ ssh_access_role }}"
-      tags:
-        - jenkins        # include it in jenkins runs
-        - ssh_access     # still allow running it standalone if needed
-        - set_ssh_access # fine-grained override if desired
-
     - name: Include Jenkins volume mount role
       ansible.builtin.include_role:
         name: "{{ jenkins_volume_role }}"
