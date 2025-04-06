@@ -1,16 +1,22 @@
 ---
 # PROD Infrastructure and Application Deployment (Blue/Green)
 
-# Step 1: Setup base infrastructure (PROD)
-- name: Setup base infrastructure (PROD)
+- name: Setup base infrastructure and deploy both containers by default
   hosts: prod
   become: true
+
   vars_files:
     - group_vars/all.yml
     - group_vars/all.secrets.yml
     - group_vars/{{ cloud_provider }}/{{ cloud_provider }}.yml
     - group_vars/{{ cloud_provider }}/{{ cloud_provider }}.secrets.yml
+
+  # Set a static default; Jenkins can still override with `-e prod_site_target=blue|green|both`
+  vars:
+    prod_site_target: "both"
+
   tasks:
+    # Step 1: Infrastructure setup
     - name: Include bootstrap role
       ansible.builtin.include_role:
         name: "{{ bootstrap_role }}"
@@ -33,23 +39,18 @@
 
     - name: Include nginx role
       ansible.builtin.include_role:
-        name: "nginx"
-      tags: nginx
+        name: nginx
+      tags:
+        - nginx
+        - certbot
 
     - name: Include SSH access role
       ansible.builtin.include_role:
-        name: "{{ ssh_access_role }}"
+        name: prod_site
       tags: set_ssh_access
 
-# Step 2: Deploy PROD web container (Blue/Green)
-- name: Deploy PROD web container (Blue/Green)
-  hosts: prod
-  become: true
-  vars_files:
-    - group_vars/all.yml
-    - group_vars/all.secrets.yml
-    - group_vars/{{ cloud_provider }}/{{ cloud_provider }}.yml
-    - group_vars/{{ cloud_provider }}/{{ cloud_provider }}.secrets.yml
-  roles:
-    - role: prod_site
+    # Step 2: Always include prod_site for web container deployment
+    - name: Deploy PROD site (blue/green logic inside role)
+      ansible.builtin.include_role:
+        name: prod_site
       tags: prod_site

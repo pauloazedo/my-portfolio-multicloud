@@ -13,7 +13,6 @@
 ############################################################
 # Step 2: Authenticate with OCIR (only if needed)
 ############################################################
-
 - name: Check if already logged into OCIR
   ansible.builtin.command: docker info
   register: docker_info_check
@@ -95,7 +94,7 @@
 
 - name: Render fallback HTML
   ansible.builtin.template:
-    src: files/uat-fallback-index.html.j2
+    src: uat-fallback-index.html.j2
     dest: /home/devops/uat-fallback-index.html
     owner: devops
     group: devops
@@ -115,7 +114,7 @@
 
 - name: Copy fallback Dockerfile
   ansible.builtin.copy:
-    src: files/uat-fallback.Dockerfile
+    src: uat-fallback.Dockerfile
     dest: "{{ uat_site_fallback_build_dir }}/Dockerfile"
     owner: devops
     group: devops
@@ -125,7 +124,7 @@
 
 - name: Copy shared fallback NGINX config
   ansible.builtin.copy:
-    src: files/default-waiting.conf
+    src: default-waiting.conf
     dest: "{{ uat_site_fallback_build_dir }}/default-waiting.conf"
     owner: devops
     group: devops

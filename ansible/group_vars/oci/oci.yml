@@ -1,6 +1,4 @@
-# ansible/group_vars/oci/oci.yml
 # OCI-specific configuration
-
 cloud_provider: oci
 
 ############################################################
@@ -8,9 +6,8 @@ cloud_provider: oci
 ############################################################
 bootstrap_role: bootstrap
 common_role: common
-hardening_role: hardening
 docker_role: docker
-ssh_access_role: ssh_access
+hardening_role: hardening
 jenkins_volume_role: jenkins_volume
 
 ############################################################
@@ -18,63 +15,60 @@ jenkins_volume_role: jenkins_volume
 ############################################################
 ocir_namespace: "idtijq8cx4jl"
 
+# Image URIs
+uat_site_ocir_repo: "iad.ocir.io/{{ ocir_namespace }}/uat-site"
+uat_site_image: "{{ uat_site_ocir_repo }}:{{ uat_site_image_tag | default('latest') }}"
+uat_site_waiting_image: "iad.ocir.io/{{ ocir_namespace }}/uat-waiting:latest"
+
+prod_site_green_image: "iad.ocir.io/{{ ocir_namespace }}/prod-site:green"
+prod_site_blue_image:  "iad.ocir.io/{{ ocir_namespace }}/prod-site:blue"
+prod_site_waiting_image: "iad.ocir.io/{{ ocir_namespace }}/prod-waiting:latest"
+
 ############################################################
-# DNS Configuration (per environment)
+# Domain and FQDN Configuration
 ############################################################
 jenkins_domain: "oci.jenkins.pauloazedo.dev"
-uat_domain: "oci.uat.pauloazedo.dev"
-prod_domain: "oci.prod.pauloazedo.dev"
+uat_domain:     "oci.uat.pauloazedo.dev"
+prod_domain:    "oci.prod.pauloazedo.dev"
+www_domain:     "www.pauloazedo.dev"
 
-# Full FQDNs (in case you need to override for multi-cloud)
 jenkins_fqdn: "{{ jenkins_domain }}"
-uat_fqdn: "{{ uat_domain }}"
-prod_fqdn: "{{ prod_domain }}"
+uat_fqdn:     "{{ uat_domain }}"
+prod_fqdn:    "{{ prod_domain }}"
 
 ############################################################
 # Jenkins Persistent Volume Configuration
 ############################################################
 jenkins_data_dir: "/home/devops/jenkins_data"
 
-# Volume mount inside instance (used by jenkins_volume role)
-cloud_volume_device: "/dev/sdb"
-cloud_volume_mount_point: "/home/devops/jenkins_data"
+cloud_volume_device:          "/dev/sdb"
+cloud_volume_mount_point:     "/home/devops/jenkins_data"
 cloud_volume_filesystem_type: "ext4"
 
 ############################################################
 # UAT Site Configuration
 ############################################################
-uat_site_ocir_repo: "iad.ocir.io/{{ ocir_namespace }}/uat-site"
-uat_site_image: "{{ uat_site_ocir_repo }}:{{ uat_site_image_tag | default('latest') }}"
-uat_site_waiting_image: "iad.ocir.io/{{ ocir_namespace }}/uat-waiting:latest"
 uat_site_container: "uat-site"
-uat_site_port: 3000
+uat_site_port:      3000
 
-# Git metadata for building the UAT site image
-uat_site_git_repo: "https://github.com/pauloazedo/my-portfolio-oci-devops.git"
-uat_site_git_branch: "uat"
-uat_site_dockerfile_path: "my-portfolio/frontend"
-
-############################################################
-# UAT Fallback Build (Local Build + Push)
-############################################################
-uat_site_fallback_image: "iad.ocir.io/{{ ocir_namespace }}/uat-waiting:latest"
+uat_site_git_repo:           "https://github.com/pauloazedo/my-portfolio-oci-devops.git"
+uat_site_git_branch:         "uat"
+uat_site_dockerfile_path:    "my-portfolio/frontend"
+uat_site_fallback_image:     "{{ uat_site_waiting_image }}"
 uat_site_fallback_build_dir: "/home/devops/uat-fallback"
 
 ############################################################
 # PROD Site Configuration (Blue/Green Deployments)
 ############################################################
-prod_site_green_image: "iad.ocir.io/{{ ocir_namespace }}/prod-site:green"
 prod_site_green_container: "prod-site-green"
-prod_site_green_port: 3100
+prod_site_green_port:      3100
 
-prod_site_blue_image: "iad.ocir.io/{{ ocir_namespace }}/prod-site:blue"
-prod_site_blue_container: "prod-site-blue"
-prod_site_blue_port: 3200
-
-# Fallback container image
-prod_site_waiting_image: "iad.ocir.io/{{ ocir_namespace }}/prod-waiting:latest"
+prod_site_blue_container:  "prod-site-blue"
+prod_site_blue_port:       3200
 
 ############################################################
-# Slack Integrations
+# Slack Integration
 ############################################################
 slack_cert_renewal_webhook: "https://hooks.slack.com/services/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"
+
+force_fallback: false

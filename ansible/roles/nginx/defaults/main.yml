@@ -1,0 +1,5 @@
+# ansible/roles/nginx/defaults/main.yml
+nginx_slack_app_name: "Certificate Alerts"
+nginx_slack_app_description: "Sends Certbot renewal alerts"
+nginx_slack_app_color: "#4A154B"
+nginx_slack_bot_display_name: "Certbot Bot"

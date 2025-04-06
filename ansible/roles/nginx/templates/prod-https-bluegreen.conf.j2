@@ -1,11 +1,3 @@
-# Redirect HTTP to HTTPS for both domains
-server {
-    listen 80;
-    server_name {{ prod_domain }} {{ www_domain }};
-    return 301 https://$host$request_uri;
-}
-
-# HTTPS configuration for both domains
 server {
     listen 443 ssl;
     server_name {{ prod_domain }} {{ www_domain }};
@@ -15,19 +7,23 @@ server {
     include             /etc/letsencrypt/options-ssl-nginx.conf;
     ssl_dhparam         /etc/letsencrypt/ssl-dhparams.pem;
 
-    # Route / and /green to green container
-    location ~ ^/(|green)(/.*)?$ {
-        rewrite ^/(green)?(/.*)?$ / break;
-        proxy_pass http://localhost:3100;
+    # Serve green container at root
+    location / {
+        proxy_pass http://localhost:{{ prod_site_green_port }}/;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
     }
 
-    # Route /blue to blue container
-    location /blue {
-        rewrite ^/blue(/.*)?$ / break;
-        proxy_pass http://localhost:3200;
+    location /green/ {
+        proxy_pass http://localhost:{{ prod_site_green_port }}/;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    }
+
+    location /blue/ {
+        proxy_pass http://localhost:{{ prod_site_blue_port }}/;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;

@@ -1,9 +1,9 @@
-<!-- ansible/files/prod-fallback-index.html.j2 -->
+<!-- ansible/roles/prod_site/templates/prod-fallback-index.html.j2 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>PROD Site – Waiting</title>
+    <title>PROD teste $FALLBACK_LABEL Environment – Waiting</title>
     <style>
         body {
             background-color: #0f172a;
@@ -23,28 +23,29 @@
         }
         p {
             font-size: 1.2rem;
-            max-width: 500px;
-            line-height: 1.5;
+            max-width: 520px;
+            line-height: 1.6;
             color: #94a3b8;
         }
         a.highlight {
-            color: #f97316; /* Tailwind orange-500 */
+            color: #f97316;
             font-weight: bold;
             text-decoration: none;
         }
         a.highlight:hover {
             text-decoration: underline;
         }
-        .color-label {
+        .env-label {
             font-weight: 900;
             font-size: 1.3rem;
+            padding-left: 0.5rem;
+            color: $FALLBACK_COLOR;
         }
     </style>
 </head>
 <body>
     <h1>
-        PROD Environment Ready
-        <span class="color-label" style="color: {{ fallback_color }};">({{ fallback_color }})</span> ✅
+        PROD <span class="env-label">TESTE $FALLBACK_LABEL</span> Environment Ready ✅
     </h1>
     <p>
         Waiting for
@@ -52,7 +53,7 @@
             Jenkins
         </a>
         to promote and deploy the latest
-        <span class="color-label" style="color: {{ fallback_color }};">{{ fallback_color }}</span> release via pipeline 🚀
+        <span class="env-label">Teste $FALLBACK_LABEL</span> release via pipeline 🚀
     </p>
 </body>
 </html>
