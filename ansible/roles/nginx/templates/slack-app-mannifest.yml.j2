@@ -1,0 +1,20 @@
+# ansible/roles/nginx/templates/slack-app-manifest.yml.j2
+display_information:
+  name: "{{ nginx_slack_app_name }}"
+  description: "{{ nginx_slack_app_description }}"
+  background_color: "{{ nginx_slack_app_color }}"
+
+features:
+  bot_user:
+    display_name: "{{ nginx_slack_bot_display_name }}"
+    always_online: true
+
+oauth_config:
+  scopes:
+    bot:
+      - chat:write
+
+settings:
+  org_deploy_enabled: false
+  socket_mode_enabled: false
+  token_rotation_enabled: false

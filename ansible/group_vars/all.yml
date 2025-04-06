@@ -3,3 +3,4 @@
 
 # This provider is responsible for the shared domain www.pauloazedo.dev
 default_provider: "oci"
+target_env: ""

@@ -4,6 +4,9 @@
   hosts: uat
   become: true
 
+  ############################################################
+  # Load all required variables and secrets (common + cloud)
+  ############################################################
   vars_files:
     - group_vars/all.yml
     - group_vars/all.secrets.yml
@@ -11,62 +14,83 @@
     - group_vars/{{ default_provider }}/{{ default_provider }}.secrets.yml
 
   tasks:
+
+    ############################################################
+    # Re-import cloud-specific vars (override protection)
+    ############################################################
     - name: Re-include cloud-specific vars (in case overridden in secrets)
       ansible.builtin.include_vars:
         file: "group_vars/{{ cloud_provider }}/{{ cloud_provider }}.yml"
-      tags:
-        - always
-        - ssh_access
+      tags: [always, ssh_access]
 
     - name: Re-include cloud-specific secrets with namespace
       ansible.builtin.include_vars:
         file: "group_vars/{{ cloud_provider }}/{{ cloud_provider }}.secrets.yml"
         name: cloud_secrets
-      tags:
-        - always
-        - ssh_access
+      tags: [always, ssh_access]
 
+    ############################################################
+    # Step 1: Bootstrap system-level configuration
+    ############################################################
     - name: Include bootstrap role
       ansible.builtin.include_role:
         name: "{{ bootstrap_role }}"
-      tags: bootstrap
+      tags: [bootstrap]
 
     - name: Include common role
       ansible.builtin.include_role:
         name: "{{ common_role }}"
-      tags: common
+      tags: [common]
 
     - name: Include hardening role
       ansible.builtin.include_role:
         name: "{{ hardening_role }}"
-      tags: hardening
+      tags: [hardening]
 
     - name: Include docker role
       ansible.builtin.include_role:
         name: "{{ docker_role }}"
-      tags: docker
+      tags: [docker]
 
     - name: Include nginx role
       ansible.builtin.include_role:
         name: nginx
-      tags: nginx
+      tags: [nginx]
 
+    ############################################################
+    # Step 2: Jenkins (volume + container + configuration)
+    ############################################################
     - name: Include Jenkins volume mount role
       ansible.builtin.include_role:
         name: "{{ jenkins_volume_role }}"
-      tags:
-        - jenkins
-        - jenkins_volume
+      tags: [jenkins, jenkins_volume]
 
     - name: Include Jenkins role
       ansible.builtin.include_role:
         name: jenkins
-      tags:
-        - jenkins
-        - jenkins_tools
-        - jenkins_cleanup
+      tags: [jenkins, jenkins_tools, jenkins_cleanup]
 
-    - name: Deploy UAT site container
+    ############################################################
+    # Step 2.5: Export Jenkins public key to control node
+    ############################################################
+    - name: Copy Jenkins public key to control node (for PROD SSH trust)
+      ansible.builtin.fetch:
+        src: "{{ jenkins_data_dir }}/.ssh/id_rsa.pub"
+        dest: "ansible/files/jenkins_id_rsa.pub"
+        flat: true
+      tags: [jenkins, jenkins_ssh_export]
+
+    ############################################################
+    # Step 2.6: Ensure Jenkins has SSH access to PROD
+    ############################################################
+    - name: Set up SSH access from Jenkins to PROD
+      ansible.builtin.include_tasks: roles/prod_site/tasks/ssh-access.yml
+      tags: [ssh_access]
+
+    ############################################################
+    # Step 3: UAT Application Deployment
+    ############################################################
+    - name: Deploy UAT site container (real or fallback)
       ansible.builtin.include_role:
         name: uat_site
-      tags: uat_site
+      tags: [uat_site]

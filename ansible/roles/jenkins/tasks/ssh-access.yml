@@ -25,9 +25,14 @@
     src: "{{ jenkins_data_dir }}/.ssh/id_rsa.pub"
   register: jenkins_pub_key
 
-- name: Add Jenkins public key to authorized_keys
+- name: Add Jenkins public key to authorized_keys on UAT and PROD
   ansible.posix.authorized_key:
     user: "{{ ansible_user }}"
     state: present
     key: "{{ jenkins_pub_key['content'] | b64decode }}"
     manage_dir: true
+  delegate_to: "{{ item }}"
+  run_once: true
+  loop:
+    - "{{ uat_fqdn }}"
+    - "{{ prod_fqdn }}"

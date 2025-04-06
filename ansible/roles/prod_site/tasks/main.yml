@@ -1,13 +1,18 @@
 ---
-# PROD Site Deployment - Blue/Green with fallback and image labeling
+# ansible/roles/prod_site/tasks/main.yml
+# PROD Site Blue/Green Deployment Logic with Fallback
 
-# Step 1: Ensure Docker is installed
+#####################################################################
+# Step 1: Ensure Docker is installed on the PROD host
+#####################################################################
 - name: Ensure Docker is installed
   ansible.builtin.include_role:
     name: docker
   tags: always
 
-# Step 2: Authenticate to OCIR
+#####################################################################
+# Step 2: Authenticate with OCIR (Oracle Container Registry)
+#####################################################################
 - name: Check if already logged into OCIR
   ansible.builtin.command: docker info
   register: docker_info_check
@@ -24,181 +29,45 @@
   no_log: true
   changed_when: false
 
-# Steps 3 and 4 on check_images.yml
-- name: Include image pull and flag check
+#####################################################################
+# Step 3: Check if blue/green images exist or fallback is needed
+#####################################################################
+- name: Check availability of green/blue images
   ansible.builtin.include_tasks: check_images.yml
   tags: fallback
 
-# Step 5: Build and push fallback image (if both fail)
-- name: Copy fallback Dockerfile
-  ansible.builtin.copy:
-    src: files/prod-waiting.Dockerfile
-    dest: /home/devops/prod-waiting.Dockerfile
-    owner: devops
-    group: devops
-    mode: '0644'
+#####################################################################
+# Step 4: Build and push fallback image if both images are missing
+#####################################################################
+- name: Build and push fallback image
+  ansible.builtin.include_tasks: run-fallback.yml
   when: not green_image_available and not blue_image_available
   tags: fallback
 
-- name: Copy shared fallback NGINX config
-  ansible.builtin.copy:
-    src: files/default-waiting.conf
-    dest: /home/devops/default-waiting.conf
-    owner: devops
-    group: devops
-    mode: '0644'
-  when: not green_image_available and not blue_image_available
+#####################################################################
+# Step 5: Deploy environments
+#####################################################################
+- name: Deploy to blue environment
+  ansible.builtin.include_tasks: run-blue.yml
+  when: prod_site_target in ["both", "blue"]
+
+- name: Deploy to green environment
+  ansible.builtin.include_tasks: run-green.yml
+  when: prod_site_target in ["both", "green"]
+
+#####################################################################
+# Step 6: Cleanup fallback containers (blue/green)
+#####################################################################
+- name: Cleanup fallback resources for blue
+  ansible.builtin.include_tasks: cleanup-blue.yml
+  when:
+    - prod_site_target in ["both", "blue"]
+    - not green_image_available and not blue_image_available
   tags: fallback
 
-- name: Copy fallback HTML template
-  ansible.builtin.copy:
-    src: files/prod-fallback-index.html
-    dest: /home/devops/index.html
-    owner: devops
-    group: devops
-    mode: '0644'
-  when: not green_image_available and not blue_image_available
-  tags: fallback
-
-- name: Render fallback HTML with dynamic color and Jenkins domain
-  ansible.builtin.template:
-    src: prod-fallback-index.html.j2
-    dest: /home/devops/prod-fallback-index.html
-    owner: devops
-    group: devops
-    mode: '0644'
-  when: not green_image_available and not blue_image_available
-  tags: fallback
-  vars:
-    fallback_color: green  # or blue depending on context (use loop or duplication if needed)
-
-- name: Build fallback PROD image
-  community.docker.docker_image:
-    name: "prod-waiting"
-    tag: "latest"
-    source: build
-    force_source: true
-    build:
-      path: /home/devops
-      dockerfile: prod-waiting.Dockerfile
-      labels:
-        org.opencontainers.image.created: "{{ ansible_date_time.iso8601 }}"
-        org.opencontainers.image.description: "Fallback PROD site - waiting for Jenkins"
-        org.opencontainers.image.source: "ansible"
-  when: not green_image_available and not blue_image_available
-  tags: fallback
-
-- name: Tag fallback image
-  ansible.builtin.command:
-    cmd: docker tag prod-waiting:latest {{ prod_site_waiting_image }}
-  when: not green_image_available and not blue_image_available
-  changed_when: true
-  tags: fallback
-
-- name: Push fallback image
-  ansible.builtin.command:
-    cmd: docker push {{ prod_site_waiting_image }}
-  when: not green_image_available and not blue_image_available
-  changed_when: true
-  tags: fallback
-
-# Step 6: Remove existing containers
-- name: Remove green container
-  community.docker.docker_container:
-    name: "{{ prod_site_green_container }}"
-    state: absent
-    force_kill: true
-
-- name: Remove blue container
-  community.docker.docker_container:
-    name: "{{ prod_site_blue_container }}"
-    state: absent
-    force_kill: true
-
-# Step 7: Run green container (real or fallback)
-- name: Start green container with real image
-  community.docker.docker_container:
-    name: "{{ prod_site_green_container }}"
-    image: "{{ prod_site_green_image }}"
-    restart_policy: always
-    published_ports:
-      - "{{ prod_site_green_port }}:3000"
-    recreate: true
-    state: started
-  when: green_image_available | default(false)
-
-- name: Start green container with fallback image
-  community.docker.docker_container:
-    name: "{{ prod_site_green_container }}"
-    image: "{{ prod_site_waiting_image }}"
-    restart_policy: always
-    published_ports:
-      - "{{ prod_site_green_port }}:3000"
-    recreate: true
-    state: started
-    env:
-      FALLBACK_COLOR: green
-  when: not green_image_available | default(false)
-  tags: fallback
-
-# Step 8: Run blue container (real or fallback)
-- name: Start blue container with real image
-  community.docker.docker_container:
-    name: "{{ prod_site_blue_container }}"
-    image: "{{ prod_site_blue_image }}"
-    restart_policy: always
-    published_ports:
-      - "{{ prod_site_blue_port }}:3000"
-    recreate: true
-    state: started
-  when: blue_image_available | default(false)
-
-- name: Start blue container with fallback image
-  community.docker.docker_container:
-    name: "{{ prod_site_blue_container }}"
-    image: "{{ prod_site_waiting_image }}"
-    restart_policy: always
-    published_ports:
-      - "{{ prod_site_blue_port }}:3000"
-    recreate: true
-    state: started
-    env:
-      FALLBACK_COLOR: blue
-  when: not blue_image_available | default(false)
-  tags: fallback
-
-# Step 9: Cleanup fallback images
-- name: Remove older fallback Docker images
-  ansible.builtin.shell: |
-    set -o pipefail
-    docker images --filter=reference='prod-waiting' --format '{{ '{{' }}.Repository{{ '}}' }}:{{ '{{' }}.Tag{{ '}}' }} {{ '{{' }}.ID{{ '}}' }}' |
-    grep -v 'prod-waiting:latest' | awk '{print $2}' | xargs -r docker rmi
-  args:
-    executable: /bin/bash
-  register: cleanup_result
-  changed_when: cleanup_result.stdout != ""
-  failed_when: false
-  when: not green_image_available and not blue_image_available
-  tags: fallback
-
-# Step 10: Clean up build files
-- name: Remove prod-waiting.Dockerfile
-  ansible.builtin.file:
-    path: /home/devops/prod-waiting.Dockerfile
-    state: absent
-  when: not green_image_available and not blue_image_available
-  tags: fallback
-
-- name: Remove default-waiting.conf
-  ansible.builtin.file:
-    path: /home/devops/default-waiting.conf
-    state: absent
-  when: not green_image_available and not blue_image_available
-  tags: fallback
-
-- name: Remove index.template.html
-  ansible.builtin.file:
-    path: /home/devops/index.template.html
-    state: absent
-  when: not green_image_available and not blue_image_available
+- name: Cleanup fallback resources for green
+  ansible.builtin.include_tasks: cleanup-green.yml
+  when:
+    - prod_site_target in ["both", "green"]
+    - not green_image_available and not blue_image_available
   tags: fallback

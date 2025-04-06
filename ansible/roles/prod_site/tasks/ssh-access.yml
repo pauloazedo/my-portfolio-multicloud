@@ -1,0 +1,17 @@
+---
+# This sets up SSH access from Jenkins to the PROD host server
+
+- name: Ensure ~/.ssh directory exists
+  ansible.builtin.file:
+    path: "/home/{{ ansible_user }}/.ssh"
+    state: directory
+    mode: '0700'
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+
+- name: Add Jenkins public key to authorized_keys on PROD
+  ansible.posix.authorized_key:
+    user: "{{ ansible_user }}"
+    state: present
+    key: "{{ lookup('file', 'files/jenkins_id_rsa.pub') }}"
+    manage_dir: false

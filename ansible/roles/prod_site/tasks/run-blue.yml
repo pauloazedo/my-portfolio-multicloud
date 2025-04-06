@@ -1,0 +1,49 @@
+---
+# ansible/roles/prod_site/tasks/run-blue.yml
+# Deploy the PROD Blue container, with fallback if needed
+
+############################################################
+# Step 1: Remove existing blue container (if any)
+############################################################
+- name: Remove existing blue container
+  community.docker.docker_container:
+    name: "{{ prod_site_blue_container }}"
+    state: absent
+    force_kill: true
+  ignore_errors: true
+  register: blue_cleanup
+
+- name: Log cleanup result
+  ansible.builtin.debug:
+    msg: "Removed existing blue container: {{ blue_cleanup.changed }}"
+
+############################################################
+# Step 2: Run blue container with real image (if available)
+############################################################
+- name: Run blue container with real image
+  community.docker.docker_container:
+    name: "{{ prod_site_blue_container }}"
+    image: "{{ prod_site_blue_image }}"
+    restart_policy: always
+    published_ports:
+      - "{{ prod_site_blue_port }}:3000"
+    recreate: true
+    state: started
+  when: blue_image_available | default(false)
+
+############################################################
+# Step 3: Run blue container with fallback image (if needed)
+############################################################
+- name: Run blue container with fallback image
+  community.docker.docker_container:
+    name: "{{ prod_site_blue_container }}"
+    image: "{{ prod_site_waiting_image }}"
+    restart_policy: always
+    published_ports:
+      - "{{ prod_site_blue_port }}:3000"
+    recreate: true
+    state: started
+    env:
+      FALLBACK_COLOR: blue
+  when: not blue_image_available | default(false)
+  tags: fallback

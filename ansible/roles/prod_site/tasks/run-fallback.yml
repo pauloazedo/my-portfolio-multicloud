@@ -1,0 +1,94 @@
+---
+# ansible/roles/prod_site/tasks/run-fallback.yml
+# Build and push fallback PROD image to OCIR (used by both blue and green)
+
+############################################################
+# Step 1: Render fallback HTML pages
+############################################################
+- name: Render fallback page for green
+  ansible.builtin.template:
+    src: prod-fallback-index.html.j2
+    dest: /home/devops/prod-fallback-green.html
+    owner: devops
+    group: devops
+    mode: '0644'
+  vars:
+    fallback_color: green
+
+- name: Render fallback page for blue
+  ansible.builtin.template:
+    src: prod-fallback-index.html.j2
+    dest: /home/devops/prod-fallback-blue.html
+    owner: devops
+    group: devops
+    mode: '0644'
+  vars:
+    fallback_color: blue
+
+############################################################
+# Step 2: Prepare fallback Docker build context
+############################################################
+- name: Copy fallback Dockerfile
+  ansible.builtin.copy:
+    src: files/prod-waiting.Dockerfile
+    dest: /home/devops/prod-waiting.Dockerfile
+    owner: devops
+    group: devops
+    mode: '0644'
+
+- name: Copy fallback NGINX config
+  ansible.builtin.copy:
+    src: files/default-waiting.conf
+    dest: /home/devops/default-waiting.conf
+    owner: devops
+    group: devops
+    mode: '0644'
+
+- name: Copy fallback green HTML into build context as prod-fallback-index.html
+  ansible.builtin.copy:
+    src: /home/devops/prod-fallback-green.html
+    dest: /home/devops/prod-fallback-index.html
+    remote_src: true
+    owner: devops
+    group: devops
+    mode: '0644'
+
+############################################################
+# Step 3: Build fallback Docker image
+############################################################
+- name: Build fallback PROD image
+  community.docker.docker_image:
+    name: prod-waiting
+    tag: latest
+    source: build
+    force_source: true
+    build:
+      path: /home/devops
+      dockerfile: prod-waiting.Dockerfile
+      labels:
+        org.opencontainers.image.created: "{{ ansible_date_time.iso8601 }}"
+        org.opencontainers.image.description: "Fallback PROD site – waiting for Jenkins"
+        org.opencontainers.image.source: "ansible"
+  register: fallback_build_result
+
+- name: Log fallback image build result
+  ansible.builtin.debug:
+    msg: "Built fallback PROD image: {{ fallback_build_result.image }}"
+
+############################################################
+# Step 4: Tag and push fallback image to OCIR
+############################################################
+- name: Tag fallback image for OCIR
+  ansible.builtin.command:
+    cmd: docker tag prod-waiting:latest {{ prod_site_waiting_image }}
+  changed_when: true
+
+- name: Push fallback image to OCIR
+  ansible.builtin.command:
+    cmd: docker push {{ prod_site_waiting_image }}
+  changed_when: true
+  register: fallback_push_result
+
+- name: Log fallback image push result
+  ansible.builtin.debug:
+    msg: "Pushed fallback image to OCIR: {{ fallback_push_result.stdout_lines | default([]) }}"
