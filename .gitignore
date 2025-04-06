@@ -37,18 +37,18 @@ yarn-error.log*
 # -----------------------
 *.pem
 .env*
-*.secrets.yml
-*.secrets.yml.*
+#*.secrets.yml
+#*.secrets.yml.*
 ansible-vault.pass
 ansible/.vault_pass
 
 # Ignore all provider-specific secrets
-ansible/group_vars/*/*.secrets.yml
-ansible/group_vars/*/*.secrets.yml.*
+#ansible/group_vars/*/*.secrets.yml
+#ansible/group_vars/*/*.secrets.yml.*
 
 # Ignore legacy global secrets
-ansible/group_vars/all.secrets.yml
-ansible/group_vars/all.secrets.yml.*
+#ansible/group_vars/all.secrets.yml
+#ansible/group_vars/all.secrets.yml.*
 
 # -----------------------
 # Terraform

@@ -66,9 +66,4 @@ prod_site_green_port:      3100
 prod_site_blue_container:  "prod-site-blue"
 prod_site_blue_port:       3200
 
-############################################################
-# Slack Integration
-############################################################
-slack_cert_renewal_webhook: "https://hooks.slack.com/services/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"
-
 force_fallback: false
