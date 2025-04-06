@@ -90,7 +90,8 @@ pipeline {
             --limit uat \
             --tags uat_site \
             --extra-vars "uat_site_custom_image=${OCIR_REPO}:${IMAGE_TAG} \
-                          uat_site_image_tag=${IMAGE_TAG}"
+                          uat_site_image_tag=${IMAGE_TAG}" \
+            --vault-password-file /var/jenkins_home/.ansible_vault_pass
         '''
       }
 
