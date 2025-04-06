@@ -41,8 +41,11 @@
 #####################################################################
 - name: Build and push fallback image
   ansible.builtin.include_tasks: run-fallback.yml
-  when: not green_image_available and not blue_image_available
-  tags: fallback
+  when:
+    - force_fallback | default(false) or (not green_image_available and not blue_image_available)
+  tags:
+    - fallback
+    - force-fallback
 
 #####################################################################
 # Step 5: Deploy environments

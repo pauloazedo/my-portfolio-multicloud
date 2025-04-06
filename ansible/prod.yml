@@ -40,7 +40,9 @@
     - name: Include nginx role
       ansible.builtin.include_role:
         name: nginx
-      tags: nginx
+      tags:
+        - nginx
+        - certbot
 
     - name: Include SSH access role
       ansible.builtin.include_role:
