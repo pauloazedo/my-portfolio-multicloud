@@ -92,10 +92,10 @@
   when: not (uat_image_available | default(false))
   tags: [uat_site, fallback]
 
-- name: Render fallback HTML
+- name: Render fallback HTML as index.template.html
   ansible.builtin.template:
     src: uat-fallback-index.html.j2
-    dest: /home/devops/uat-fallback-index.html
+    dest: /home/devops/index.template.html
     owner: devops
     group: devops
     mode: '0644'
@@ -132,10 +132,10 @@
   when: not (uat_image_available | default(false))
   tags: [uat_site, fallback]
 
-- name: Copy rendered fallback HTML into build context with correct name
+- name: Copy rendered fallback HTML to build context as index.template.html
   ansible.builtin.copy:
-    src: /home/devops/uat-fallback-index.html
-    dest: "{{ uat_site_fallback_build_dir }}/uat-fallback-index.html"
+    src: /home/devops/index.template.html
+    dest: "{{ uat_site_fallback_build_dir }}/index.template.html"
     remote_src: true
     owner: devops
     group: devops

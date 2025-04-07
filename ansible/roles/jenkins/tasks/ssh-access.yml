@@ -1,5 +1,5 @@
 ---
-# Configure SSH access and known_hosts for Jenkins container to connect to target servers
+# Configure SSH access and known_hosts for Jenkins container to connect to UAT and PROD servers
 
 - name: Generate SSH keypair for Jenkins (id_rsa)
   community.crypto.openssh_keypair:
@@ -11,9 +11,12 @@
     group: "1000"
     mode: "0600"
 
-- name: Fetch SSH host keys for UAT and PROD
-  ansible.builtin.shell: >
-    ssh-keyscan -H {{ uat_fqdn }} {{ prod_fqdn }} > "{{ jenkins_data_dir }}/.ssh/known_hosts"
+- name: Fetch and save SSH host keys for UAT and PROD
+  ansible.builtin.shell: |
+    {
+      ssh-keyscan -H {{ uat_fqdn }} || true;
+      ssh-keyscan -H {{ prod_fqdn }} || true;
+    } > "{{ jenkins_data_dir }}/.ssh/known_hosts"
   args:
     executable: /bin/bash
   register: known_hosts_cmd
@@ -27,7 +30,7 @@
 
 - name: Add Jenkins public key to authorized_keys on UAT and PROD
   ansible.posix.authorized_key:
-    user: "{{ ansible_user }}"
+    user: "{{ ansible_user | default('devops') }}"
     state: present
     key: "{{ jenkins_pub_key['content'] | b64decode }}"
     manage_dir: true

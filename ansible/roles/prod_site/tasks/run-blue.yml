@@ -43,7 +43,6 @@
       - "{{ prod_site_blue_port }}:3000"
     recreate: true
     state: started
-    env:
-      FALLBACK_COLOR: blue
+    env: "{{ prod_site_blue_env }}"
   when: not blue_image_available | default(false)
   tags: fallback

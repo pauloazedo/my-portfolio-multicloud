@@ -3,11 +3,13 @@
 output "uat_instance_public_ip" {
   value       = data.oci_core_vnic.uat.public_ip_address
   description = "Public IP of the UAT instance"
+  sensitive   = true
 }
 
 output "prod_instance_public_ip" {
   value       = data.oci_core_vnic.prod.public_ip_address
   description = "Public IP of the Production instance"
+  sensitive   = true
 }
 
 # === INSTANCE DISPLAY NAMES ===
@@ -32,16 +34,16 @@ output "vcn_id" {
 # === DNS RECORDS ===
 
 output "uat_dns_record" {
-  value       = "oci.uat.pauloazedo.dev"
+  value       = "${var.dns_prefix}.uat.${var.domain_name}"
   description = "Public DNS record for UAT"
 }
 
 output "prod_dns_record" {
-  value       = "oci.prod.pauloazedo.dev"
+  value       = "${var.dns_prefix}.prod.${var.domain_name}"
   description = "Public DNS record for Production"
 }
 
 output "jenkins_dns_record" {
-  value       = "oci.jenkins.pauloazedo.dev"
+  value       = "${var.dns_prefix}.jenkins.${var.domain_name}"
   description = "Public DNS record for Jenkins (on UAT)"
 }
