@@ -13,5 +13,5 @@
   ansible.posix.authorized_key:
     user: "{{ ansible_user }}"
     state: present
-    key: "{{ lookup('file', 'files/jenkins_id_rsa.pub') }}"
+    key: "{{ jenkins_pub_key['content'] | b64decode }}"
     manage_dir: false
