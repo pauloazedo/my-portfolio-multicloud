@@ -43,7 +43,6 @@
       - "{{ prod_site_green_port }}:3000"
     recreate: true
     state: started
-    env:
-      FALLBACK_COLOR: green
+    env: "{{ prod_site_green_env }}"
   when: not green_image_available | default(false)
   tags: fallback

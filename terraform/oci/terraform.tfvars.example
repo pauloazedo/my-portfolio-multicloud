@@ -1,0 +1,19 @@
+# === DNS STRUCTURE ===
+
+# Base domain for DNS records (e.g., pauloazedo.dev)
+domain_name = "yourdomain.dev"
+
+# Subdomain prefix to distinguish environments or clouds (e.g., oci, aws)
+dns_prefix = "oci"
+
+# === OCI Vault Secret OCIDs ===
+# These MUST be full OCI Vault Secret OCIDs (not values or friendly names)
+
+# Example:
+# ocid1.vaultsecret.oc1.iad.<unique-id>
+
+cloudflare_api_token_secret_id = "ocid1.vaultsecret.oc1.iad.your-cloudflare-api-token-secret-ocid"
+cloudflare_zone_id_secret_id   = "ocid1.vaultsecret.oc1.iad.your-cloudflare-zone-id-secret-ocid"
+region_secret_id               = "ocid1.vaultsecret.oc1.iad.your-region-secret-ocid"
+jenkins_volume_ocid_secret_id  = "ocid1.vaultsecret.oc1.iad.your-jenkins-volume-ocid-secret-ocid"
+ssh_public_key_secret_id       = "ocid1.vaultsecret.oc1.iad.your-ssh-public-key-secret-ocid"

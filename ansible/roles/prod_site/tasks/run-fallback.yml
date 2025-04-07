@@ -11,33 +11,9 @@
   tags: fallback
 
 ############################################################
-# Step 1: Render fallback HTML pages
+# Step 1: Prepare fallback Docker build context
 ############################################################
-- name: Render fallback page for green
-  ansible.builtin.template:
-    src: prod-fallback-index.html.j2
-    dest: /home/devops/prod-fallback-green.html
-    owner: devops
-    group: devops
-    mode: '0644'
-  vars:
-    fallback_color: green
-    fallback_label: green
 
-- name: Render fallback page for blue
-  ansible.builtin.template:
-    src: prod-fallback-index.html.j2
-    dest: /home/devops/prod-fallback-blue.html
-    owner: devops
-    group: devops
-    mode: '0644'
-  vars:
-    fallback_color: blue
-    fallback_label: Blue
-
-############################################################
-# Step 2: Prepare fallback Docker build context
-############################################################
 - name: Copy fallback Dockerfile
   ansible.builtin.copy:
     src: files/prod-waiting.Dockerfile
@@ -54,16 +30,18 @@
     group: devops
     mode: '0644'
 
-# NOTE: Only one static HTML file is needed for build – fallback will become dynamic via container ENV vars
-- name: Copy raw fallback HTML template with ${...} vars
+- name: Copy fallback HTML template with ${...} placeholders
   ansible.builtin.copy:
-    src: templates/prod-fallback-index.html.j2
+    src: templates/prod-fallback-index.template
     dest: /home/devops/prod-fallback-index.html
-    remote_src: false
+    owner: devops
+    group: devops
+    mode: '0644'
 
 ############################################################
-# Step 3: Build fallback Docker image
+# Step 2: Build fallback Docker image
 ############################################################
+
 - name: Build fallback PROD image
   community.docker.docker_image:
     name: prod-waiting
@@ -84,8 +62,9 @@
     msg: "Built fallback PROD image: {{ fallback_build_result.image }}"
 
 ############################################################
-# Step 4: Tag and push fallback image to OCIR
+# Step 3: Tag and push fallback image to OCIR
 ############################################################
+
 - name: Tag fallback image for OCIR
   ansible.builtin.command:
     cmd: docker tag prod-waiting:latest {{ prod_site_waiting_image }}
@@ -102,8 +81,9 @@
     msg: "Pushed fallback image to OCIR: {{ fallback_push_result.stdout_lines | default([]) }}"
 
 ############################################################
-# Step 5: Stop any existing fallback containers
+# Step 4: Stop any existing fallback containers
 ############################################################
+
 - name: Stop and remove existing blue fallback container
   community.docker.docker_container:
     name: prod_site_blue
@@ -117,8 +97,9 @@
     force_kill: true
 
 ############################################################
-# Step 6: Start new fallback containers with dynamic ENV
+# Step 5: Start new fallback containers with dynamic ENV
 ############################################################
+
 - name: Run fallback blue container
   community.docker.docker_container:
     name: prod_site_blue
@@ -127,10 +108,10 @@
     restart_policy: unless-stopped
     published_ports:
       - "3200:3000"
-    env:
-      FALLBACK_COLOR: "blue"
-      FALLBACK_LABEL: "Blue"
-      JENKINS_DOMAIN: "{{ jenkins_fqdn }}"
+    env:  # noqa var-naming
+      FALLBACK_LABEL: "bblue" # noqa var-naming
+      FALLBACK_COLOR: "blue" # noqa var-naming
+      JENKINS_DOMAIN: "{{ jenkins_fqdn }}" # noqa var-naming
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3000/"]
       interval: 30s
@@ -146,10 +127,11 @@
     restart_policy: unless-stopped
     published_ports:
       - "3100:3000"
-    env:
-      FALLBACK_COLOR: "green"
-      FALLBACK_LABEL: "Green"
-      JENKINS_DOMAIN: "{{ jenkins_fqdn }}"
+    env:  # noqa var-naming
+      FALLBACK_COLOR: "greencolor" # noqa var-naming
+      FALLBACK_LABEL: "greenlabel" # noqa var-naming
+      
+      JENKINS_DOMAIN: "{{ jenkins_fqdn }}" # noqa var-naming
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3000/"]
       interval: 30s
