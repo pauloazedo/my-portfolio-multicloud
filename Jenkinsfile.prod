@@ -2,11 +2,11 @@
 // Uses secure credential ID 'slack-webhook-jenkins' to access the webhook URL
 def sendSlackNotification(String message) {
   withCredentials([string(credentialsId: 'slack-webhook-jenkins', variable: 'SLACK_WEBHOOK_URL')]) {
-    sh """
-      curl -X POST -H 'Content-type: application/json' \
-      --data '{"text": "${message}"}' \
+    sh '''#!/bin/bash
+      curl -X POST -H "Content-type: application/json" \
+      --data "{\"text\": \"''' + message + '''\"}" \
       $SLACK_WEBHOOK_URL
-    """
+    '''
   }
 }
 
@@ -14,15 +14,30 @@ pipeline {
   agent any
 
   environment {
+    # Ansible inventory for PROD
     ANSIBLE_INVENTORY     = 'ansible/inventory/oci.ini'
+
+    # OCIR repo for PROD environment
     OCIR_REPO             = 'iad.ocir.io/idtijq8cx4jl/prod-site'
+
+    # Jenkins SSH key for remote deployment
     SSH_KEY_PATH          = '/var/jenkins_home/.ssh/id_rsa'
+
+    # Remote user and target for PROD server
     ANSIBLE_REMOTE_USER   = 'devops'
     ANSIBLE_TARGET_HOST   = 'oci.prod.pauloazedo.dev'
+
+    # Self-deployment marker (used by Ansible for conditional logic)
     JENKINS_MARKER        = '/var/jenkins_home/.jenkins_self_deploy'
+
+    # Frontend build sync directories
     FRONTEND_SRC_DIR      = './my-portfolio/frontend/'
     FRONTEND_DST_DIR      = '/home/devops/frontend'
+
+    # Git-based versioning
     IMAGE_TAG_FILE        = 'image_tag.txt'
+
+    # Ansible binary location (inside venv)
     VENV_ACTIVATE         = '/home/jenkins/venv/bin/ansible-playbook'
   }
 
@@ -33,19 +48,21 @@ pipeline {
 
   stages {
 
+    # Used by Blue Ocean/SCM view; safely skipped
     stage('Checkout SCM') {
       steps {
         checkout scm
       }
     }
 
+    # Explicitly pull the main branch (production branch)
     stage('Checkout main branch') {
       steps {
         git branch: 'main', url: 'https://github.com/pauloazedo/my-portfolio-multicloud.git'
       }
     }
 
-    // Dynamically use Git tag if available, otherwise fallback to Git SHA
+    # Git tag as preferred Docker tag; fallback to short commit SHA if no tag
     stage('Generate Image Tag') {
       steps {
         script {
@@ -59,6 +76,7 @@ pipeline {
       }
     }
 
+    # Sync frontend assets to PROD before container deploy
     stage('Sync Frontend to PROD (BLUE)') {
       steps {
         sh '''
@@ -70,6 +88,7 @@ pipeline {
       }
     }
 
+    # Deploy current version to blue container
     stage('Deploy BLUE Container to PROD') {
       steps {
         withCredentials([file(credentialsId: 'ansible-vault-passfile', variable: 'VAULT_PASS_FILE')]) {
@@ -78,9 +97,11 @@ pipeline {
             echo '[INFO] Creating Jenkins self-deployment marker'
             touch ${JENKINS_MARKER}
 
+            # SSH access for Ansible
             export ANSIBLE_SSH_ARGS="-i ${SSH_KEY_PATH} -o StrictHostKeyChecking=accept-new"
             export ANSIBLE_REMOTE_USER=${ANSIBLE_REMOTE_USER}
 
+            # Run Ansible playbook for blue deployment
             ${VENV_ACTIVATE} -i ${ANSIBLE_INVENTORY} ansible/prod.yml \
               --limit prod \
               --tags prod_site \
@@ -91,6 +112,7 @@ pipeline {
           '''
         }
       }
+
       post {
         always {
           sh 'rm -f ${JENKINS_MARKER} || true'
@@ -98,12 +120,14 @@ pipeline {
       }
     }
 
+    # Pause here until human approval to promote
     stage('Manual Approval: Promote BLUE to GREEN') {
       steps {
         input message: "Promote blue container to green in PROD?"
       }
     }
 
+    # Promote previously deployed image to green
     stage('Deploy GREEN Container to PROD') {
       steps {
         withCredentials([file(credentialsId: 'ansible-vault-passfile', variable: 'VAULT_PASS_FILE')]) {
@@ -111,9 +135,11 @@ pipeline {
             set -e
             echo '[INFO] Tagging image for GREEN deployment'
 
+            # SSH access for Ansible
             export ANSIBLE_SSH_ARGS="-i ${SSH_KEY_PATH} -o StrictHostKeyChecking=accept-new"
             export ANSIBLE_REMOTE_USER=${ANSIBLE_REMOTE_USER}
 
+            # Run Ansible playbook for green deployment
             ${VENV_ACTIVATE} -i ${ANSIBLE_INVENTORY} ansible/prod.yml \
               --limit prod \
               --tags prod_site \
@@ -138,4 +164,3 @@ pipeline {
     }
   }
 }
-ok, 
