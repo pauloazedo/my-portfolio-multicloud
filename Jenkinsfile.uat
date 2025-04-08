@@ -1,13 +1,13 @@
-// Slack notification helper function (cleaner version)
+// Slack notification helper function (secure, no Groovy interpolation)
 def sendSlackNotification(String message) {
   withCredentials([string(credentialsId: 'slack-webhook-jenkins', variable: 'SLACK_WEBHOOK_URL')]) {
     writeFile file: 'slack_payload.json', text: """{ "text": "${message}" }"""
-    sh """
+    sh '''
       set -e
       curl -s -X POST -H "Content-type: application/json" \
         --data @slack_payload.json \
-        --url "${SLACK_WEBHOOK_URL}"
-    """
+        --url "$SLACK_WEBHOOK_URL"
+    '''
   }
 }
 
