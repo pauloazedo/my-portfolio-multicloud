@@ -2,11 +2,14 @@
 // Uses secure credential ID 'slack-webhook-jenkins' to access the webhook URL
 def sendSlackNotification(String message) {
   withCredentials([string(credentialsId: 'slack-webhook-jenkins', variable: 'SLACK_WEBHOOK_URL')]) {
-    sh(script: """
+    sh(script: '''
       curl -X POST -H "Content-type: application/json" \
-        --data '{"text": "${message.replaceAll('"', '\\"')}"}' \
-        "$SLACK_WEBHOOK_URL"
-    """, shell: '/bin/bash')
+        --data @- "$SLACK_WEBHOOK_URL" <<EOF
+      {
+        "text": "'"${MESSAGE}"'"
+      }
+EOF
+    ''', environment: [MESSAGE: message])
   }
 }
 
