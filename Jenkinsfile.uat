@@ -2,11 +2,11 @@
 // Uses secure credential ID 'slack-webhook-jenkins' to access the webhook URL
 def sendSlackNotification(String message) {
   withCredentials([string(credentialsId: 'slack-webhook-jenkins', variable: 'SLACK_WEBHOOK_URL')]) {
-    sh '''#!/bin/bash
+    sh(script: """
       curl -X POST -H "Content-type: application/json" \
-      --data "{\"text\": \"''' + message + '''\"}" \
-      $SLACK_WEBHOOK_URL
-    '''
+        --data '{"text": "${message.replaceAll('"', '\\"')}"}' \
+        "$SLACK_WEBHOOK_URL"
+    """, shell: '/bin/bash')
   }
 }
 
@@ -14,35 +14,16 @@ pipeline {
   agent any
 
   environment {
-    // Ansible inventory file for OCI UAT environment
-    ANSIBLE_INVENTORY     = 'ansible/inventory/oci.ini'
-
-    // UAT OCIR repo (Git SHA will be used as image tag)
-    OCIR_REPO             = 'iad.ocir.io/idtijq8cx4jl/uat-site'
-
-    // SSH key used by Jenkins to connect to the UAT instance
-    SSH_KEY_PATH          = '/var/jenkins_home/.ssh/id_rsa'
-
-    // Remote SSH user for the UAT server
-    ANSIBLE_REMOTE_USER   = 'devops'
-
-    // DNS name of the UAT server
-    ANSIBLE_TARGET_HOST   = 'oci.uat.pauloazedo.dev'
-
-    // Marker file to identify self-deployment
-    JENKINS_MARKER        = '/var/jenkins_home/.jenkins_self_deploy'
-
-    // Local frontend source directory
-    FRONTEND_SRC_DIR      = './my-portfolio/frontend/'
-
-    // Remote destination path on the UAT server
-    FRONTEND_DST_DIR      = '/home/devops/frontend'
-
-    // File where the Git hash image tag is stored
-    IMAGE_TAG_FILE        = 'image_tag.txt'
-
-    // Absolute path to Ansible binary inside Jenkins' virtualenv
-    VENV_ACTIVATE         = '/home/jenkins/venv/bin/ansible-playbook'
+    ANSIBLE_INVENTORY   = 'ansible/inventory/oci.ini'
+    OCIR_REPO           = 'iad.ocir.io/idtijq8cx4jl/uat-site'
+    SSH_KEY_PATH        = '/var/jenkins_home/.ssh/id_rsa'
+    ANSIBLE_REMOTE_USER = 'devops'
+    ANSIBLE_TARGET_HOST = 'oci.uat.pauloazedo.dev'
+    JENKINS_MARKER      = '/var/jenkins_home/.jenkins_self_deploy'
+    FRONTEND_SRC_DIR    = './my-portfolio/frontend/'
+    FRONTEND_DST_DIR    = '/home/devops/frontend'
+    IMAGE_TAG_FILE      = 'image_tag.txt'
+    VENV_ACTIVATE       = '/home/jenkins/venv/bin/ansible-playbook'
   }
 
   options {
@@ -52,24 +33,31 @@ pipeline {
 
   stages {
 
-    // 1. Pull code from GitHub (UAT branch)
-    stage('Checkout') {
+    stage('Checkout SCM') {
+      steps {
+        checkout scm
+      }
+    }
+
+    stage('Checkout uat branch') {
       steps {
         git branch: 'uat', url: 'https://github.com/pauloazedo/my-portfolio-multicloud.git'
       }
     }
 
-    // 2. Generate short Git SHA to tag the Docker image
     stage('Generate Image Tag') {
       steps {
         script {
-          env.IMAGE_TAG = sh(script: "git rev-parse --short HEAD", returnStdout: true).trim()
+          def tag = sh(script: "git describe --tags --abbrev=0 || true", returnStdout: true).trim()
+          if (!tag) {
+            tag = sh(script: "git rev-parse --short HEAD", returnStdout: true).trim()
+          }
+          env.IMAGE_TAG = tag
           writeFile file: IMAGE_TAG_FILE, text: env.IMAGE_TAG
         }
       }
     }
 
-    // 3. Sync the frontend source code to the UAT server using rsync
     stage('Sync Frontend to UAT') {
       steps {
         sh '''
@@ -81,7 +69,6 @@ pipeline {
       }
     }
 
-    // 4. Run Ansible playbook to deploy the app to UAT
     stage('Run Ansible Deployment') {
       steps {
         withCredentials([file(credentialsId: 'ansible-vault-passfile', variable: 'VAULT_PASS_FILE')]) {
@@ -102,6 +89,7 @@ pipeline {
           '''
         }
       }
+
       post {
         always {
           sh 'rm -f ${JENKINS_MARKER} || true'
@@ -113,23 +101,11 @@ pipeline {
   post {
     success {
       echo "✅ UAT deployment completed: ${OCIR_REPO}:${env.IMAGE_TAG}"
-      script {
-        try {
-          sendSlackNotification("✅ Version ${env.IMAGE_TAG} published on *UAT* environment and is ready for testing.")
-        } catch (err) {
-          echo "Slack notification failed: ${err.message}"
-        }
-      }
+      sendSlackNotification("🚀 Version ${env.IMAGE_TAG} published on *UAT* environment and is ready for testing.")
     }
     failure {
       echo "❌ Pipeline failed. Check the logs for troubleshooting."
-      script {
-        try {
-          sendSlackNotification("❌ Jenkins UAT pipeline failed for ${env.JOB_NAME}.")
-        } catch (err) {
-          echo "Slack notification failed: ${err.message}"
-        }
-      }
+      sendSlackNotification("❌ Jenkins UAT pipeline failed for ${env.JOB_NAME}.")
     }
   }
 }

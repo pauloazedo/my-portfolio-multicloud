@@ -2,11 +2,11 @@
 // Uses secure credential ID 'slack-webhook-jenkins' to access the webhook URL
 def sendSlackNotification(String message) {
   withCredentials([string(credentialsId: 'slack-webhook-jenkins', variable: 'SLACK_WEBHOOK_URL')]) {
-    sh '''#!/bin/bash
+    sh(script: """
       curl -X POST -H "Content-type: application/json" \
-      --data "{\"text\": \"''' + message + '''\"}" \
-      $SLACK_WEBHOOK_URL
-    '''
+        --data '{"text": "${message.replaceAll('"', '\\"')}"}' \
+        "$SLACK_WEBHOOK_URL"
+    """, shell: '/bin/bash')
   }
 }
 
@@ -14,30 +14,15 @@ pipeline {
   agent any
 
   environment {
-    // Ansible inventory for PROD
     ANSIBLE_INVENTORY     = 'ansible/inventory/oci.ini'
-
-    // OCIR repo for PROD environment
     OCIR_REPO             = 'iad.ocir.io/idtijq8cx4jl/prod-site'
-
-    // Jenkins SSH key for remote deployment
     SSH_KEY_PATH          = '/var/jenkins_home/.ssh/id_rsa'
-
-    // Remote user and target for PROD server
     ANSIBLE_REMOTE_USER   = 'devops'
     ANSIBLE_TARGET_HOST   = 'oci.prod.pauloazedo.dev'
-
-    // Self-deployment marker (used by Ansible for conditional logic)
     JENKINS_MARKER        = '/var/jenkins_home/.jenkins_self_deploy'
-
-    // Frontend build sync directories
     FRONTEND_SRC_DIR      = './my-portfolio/frontend/'
     FRONTEND_DST_DIR      = '/home/devops/frontend'
-
-    // Git-based versioning
     IMAGE_TAG_FILE        = 'image_tag.txt'
-
-    // Ansible binary location (inside venv)
     VENV_ACTIVATE         = '/home/jenkins/venv/bin/ansible-playbook'
   }
 
@@ -48,26 +33,23 @@ pipeline {
 
   stages {
 
-    // Used by Blue Ocean/SCM view; safely skipped
     stage('Checkout SCM') {
       steps {
         checkout scm
       }
     }
 
-    // Explicitly pull the main branch (production branch)
     stage('Checkout main branch') {
       steps {
         git branch: 'main', url: 'https://github.com/pauloazedo/my-portfolio-multicloud.git'
       }
     }
 
-    // Git tag as preferred Docker tag; fallback to short commit SHA if no tag
     stage('Generate Image Tag') {
       steps {
         script {
           def tag = sh(script: "git describe --tags --abbrev=0 || true", returnStdout: true).trim()
-          if (tag == '') {
+          if (!tag) {
             tag = sh(script: "git rev-parse --short HEAD", returnStdout: true).trim()
           }
           env.IMAGE_TAG = tag
@@ -76,7 +58,6 @@ pipeline {
       }
     }
 
-    // Sync frontend assets to PROD before container deploy
     stage('Sync Frontend to PROD (BLUE)') {
       steps {
         sh '''
@@ -88,7 +69,6 @@ pipeline {
       }
     }
 
-    // Deploy current version to blue container
     stage('Deploy BLUE Container to PROD') {
       steps {
         withCredentials([file(credentialsId: 'ansible-vault-passfile', variable: 'VAULT_PASS_FILE')]) {
@@ -117,14 +97,12 @@ pipeline {
       }
     }
 
-    // Pause for approval before promoting to green
     stage('Manual Approval: Promote BLUE to GREEN') {
       steps {
         input message: "Promote blue container to green in PROD?"
       }
     }
 
-    // Promote previously deployed image to green
     stage('Deploy GREEN Container to PROD') {
       steps {
         withCredentials([file(credentialsId: 'ansible-vault-passfile', variable: 'VAULT_PASS_FILE')]) {
