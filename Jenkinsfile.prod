@@ -1,15 +1,12 @@
 // Slack notification helper function
-// Uses secure credential ID 'slack-webhook-jenkins' to access the webhook URL
 def sendSlackNotification(String message) {
   withCredentials([string(credentialsId: 'slack-webhook-jenkins', variable: 'SLACK_WEBHOOK_URL')]) {
-    def escapedMessage = message.replaceAll('"', '\\\\"')
-    def jsonPayload = """{"text": "${escapedMessage}"}"""
-
-    sh(script: """
-      curl -X POST -H 'Content-type: application/json' \
-        --data '${jsonPayload}' \
-        "$SLACK_WEBHOOK_URL"
-    """, returnStatus: true)
+    sh '''#!/bin/bash
+curl -X POST -H "Content-type: application/json" \
+  --data '{"text": "'"$MESSAGE"'"}' \
+  "$SLACK_WEBHOOK_URL"
+''' 
+    , environment: [MESSAGE: message]
   }
 }
 
