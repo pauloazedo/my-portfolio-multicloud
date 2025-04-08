@@ -3,7 +3,6 @@ pipeline {
 
   environment {
     DEPLOY_ENV = "uat"
-    DEPLOY_TAG = ""
   }
 
   stages {
@@ -21,7 +20,7 @@ pipeline {
           if (!tag) {
             tag = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
           }
-          DEPLOY_TAG = tag
+          env.DEPLOY_TAG = tag
           writeFile file: 'image-tag.txt', text: tag
         }
       }
@@ -42,7 +41,7 @@ pipeline {
         ANSIBLE_SSH_ARGS = "-i /var/jenkins_home/.ssh/id_rsa -o StrictHostKeyChecking=accept-new"
       }
       steps {
-        withCredentials([file(credentialsId: 'ansible-vault-pass', variable: 'VAULT_PASS_FILE')]) {
+        withCredentials([file(credentialsId: 'ansible-vault-passfile', variable: 'VAULT_PASS_FILE')]) {
           sh '''
             set -e
             echo "[INFO] Creating Jenkins self-deployment marker"
@@ -62,26 +61,28 @@ pipeline {
           sh 'rm -f /var/jenkins_home/.jenkins_self_deploy || true'
         }
         success {
-          echo "✅ UAT deployment completed: iad.ocir.io/idtijq8cx4jl/uat-site:${DEPLOY_TAG}"
-          sendSlackNotification("🚀 Version ${DEPLOY_TAG} published on *UAT* environment and is ready for testing.")
+          script {
+            echo "✅ UAT deployment completed: iad.ocir.io/idtijq8cx4jl/uat-site:${DEPLOY_TAG}"
+            notifySlack("🚀 Version ${DEPLOY_TAG} published on *UAT* environment and is ready for testing.")
+          }
         }
         failure {
-          echo "❌ Pipeline failed. Check the logs for troubleshooting."
-          sendSlackNotification("❌ Jenkins UAT pipeline failed for my-portfolio-uat-deploy.")
+          script {
+            echo "❌ Pipeline failed. Check the logs for troubleshooting."
+            notifySlack("❌ Jenkins UAT pipeline failed for *${env.JOB_NAME}*.")
+          }
         }
       }
     }
   }
 }
 
-def sendSlackNotification(String message) {
+def notifySlack(String msg) {
   withCredentials([string(credentialsId: 'slack-webhook-jenkins', variable: 'SLACK_URL')]) {
-    writeFile file: 'slack_payload.json', text: """{ "text": "${message}" }"""
+    writeFile file: 'slack_payload.json', text: """{ "text": "${msg}" }"""
     sh '''
       set -e
-      curl -X POST -H "Content-type: application/json" \
-        --data @slack_payload.json \
-        "$SLACK_URL"
+      cat slack_payload.json | curl -s -X POST -H "Content-type: application/json" -d @- "$SLACK_URL"
     '''
   }
 }
