@@ -1,16 +1,3 @@
-// Slack notification helper function (secure, no Groovy interpolation)
-def sendSlackNotification(String message) {
-  withCredentials([string(credentialsId: 'slack-webhook-jenkins', variable: 'SLACK_WEBHOOK_URL')]) {
-    writeFile file: 'slack_payload.json', text: """{ "text": "${message}" }"""
-    sh '''
-      set -e
-      curl -s -X POST -H "Content-type: application/json" \
-        --data @slack_payload.json \
-        --url "$SLACK_WEBHOOK_URL"
-    '''
-  }
-}
-
 pipeline {
   agent any
 
@@ -102,15 +89,20 @@ pipeline {
   post {
     success {
       echo "✅ UAT deployment completed: ${OCIR_REPO}:${env.IMAGE_TAG}"
-      script {
-        sendSlackNotification("🚀 Version ${env.IMAGE_TAG} published on *UAT* environment and is ready for testing.")
-      }
+      slackSend (
+        channel: '#jenkins_notifications',
+        color: 'good',
+        message: "🚀 Version `${env.IMAGE_TAG}` was published to *UAT* and is ready for testing.\n🔗 <${env.BUILD_URL}|View Build>"
+      )
     }
+
     failure {
       echo "❌ Pipeline failed. Check the logs for troubleshooting."
-      script {
-        sendSlackNotification("❌ Jenkins UAT pipeline failed for ${env.JOB_NAME}.")
-      }
+      slackSend (
+        channel: '#jenkins_notifications',
+        color: 'danger',
+        message: "❌ *UAT Pipeline FAILED* for `${env.JOB_NAME}`.\n🔗 <${env.BUILD_URL}|View Build>"
+      )
     }
   }
 }
