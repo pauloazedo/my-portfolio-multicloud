@@ -1,27 +1,61 @@
+// Slack notification helper function (safe version)
+def sendSlackNotification(String message) {
+  withCredentials([string(credentialsId: 'slack-webhook-jenkins', variable: 'SLACK_WEBHOOK_URL')]) {
+    writeFile file: 'slack_payload.json', text: """{ "text": "${message}" }"""
+    writeFile file: 'slack_url.txt', text: SLACK_WEBHOOK_URL
+    sh '''
+      set -e
+      curl -s -X POST -H "Content-type: application/json" \
+        --data @slack_payload.json \
+        --url "$(cat slack_url.txt)"
+    '''
+  }
+}
+
 pipeline {
   agent any
 
   environment {
-    DEPLOY_ENV = "uat"
+    ANSIBLE_INVENTORY   = 'ansible/inventory/oci.ini'
+    OCIR_REPO           = 'iad.ocir.io/idtijq8cx4jl/uat-site'
+    SSH_KEY_PATH        = '/var/jenkins_home/.ssh/id_rsa'
+    ANSIBLE_REMOTE_USER = 'devops'
+    ANSIBLE_TARGET_HOST = 'oci.uat.pauloazedo.dev'
+    JENKINS_MARKER      = '/var/jenkins_home/.jenkins_self_deploy'
+    FRONTEND_SRC_DIR    = './my-portfolio/frontend/'
+    FRONTEND_DST_DIR    = '/home/devops/frontend'
+    IMAGE_TAG_FILE      = 'image_tag.txt'
+    VENV_ACTIVATE       = '/home/jenkins/venv/bin/ansible-playbook'
+  }
+
+  options {
+    timestamps()
+    ansiColor('xterm')
   }
 
   stages {
+
+    stage('Checkout SCM') {
+      steps {
+        checkout scm
+      }
+    }
+
     stage('Checkout uat branch') {
       steps {
-        git branch: 'uat',
-            url: 'https://github.com/pauloazedo/my-portfolio-multicloud.git'
+        git branch: 'uat', url: 'https://github.com/pauloazedo/my-portfolio-multicloud.git'
       }
     }
 
     stage('Generate Image Tag') {
       steps {
         script {
-          def tag = sh(script: 'git describe --tags --abbrev=0 || true', returnStdout: true).trim()
+          def tag = sh(script: "git describe --tags --abbrev=0 || true", returnStdout: true).trim()
           if (!tag) {
-            tag = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
+            tag = sh(script: "git rev-parse --short HEAD", returnStdout: true).trim()
           }
-          env.DEPLOY_TAG = tag
-          writeFile file: 'image-tag.txt', text: tag
+          env.IMAGE_TAG = tag
+          writeFile file: IMAGE_TAG_FILE, text: env.IMAGE_TAG
         }
       }
     }
@@ -30,59 +64,54 @@ pipeline {
       steps {
         sh '''
           set -e
-          rsync -az --delete -e "ssh -i /var/jenkins_home/.ssh/id_rsa -o StrictHostKeyChecking=accept-new" ./my-portfolio/frontend/ devops@oci.uat.pauloazedo.dev:/home/devops/frontend
+          rsync -az --delete \
+            -e "ssh -i ${SSH_KEY_PATH} -o StrictHostKeyChecking=accept-new" \
+            ${FRONTEND_SRC_DIR} ${ANSIBLE_REMOTE_USER}@${ANSIBLE_TARGET_HOST}:${FRONTEND_DST_DIR}
         '''
       }
     }
 
     stage('Run Ansible Deployment') {
-      environment {
-        ANSIBLE_REMOTE_USER = "devops"
-        ANSIBLE_SSH_ARGS = "-i /var/jenkins_home/.ssh/id_rsa -o StrictHostKeyChecking=accept-new"
-      }
       steps {
         withCredentials([file(credentialsId: 'ansible-vault-passfile', variable: 'VAULT_PASS_FILE')]) {
           sh '''
             set -e
-            echo "[INFO] Creating Jenkins self-deployment marker"
-            touch /var/jenkins_home/.jenkins_self_deploy
+            echo '[INFO] Creating Jenkins self-deployment marker'
+            touch ${JENKINS_MARKER}
 
-            /home/jenkins/venv/bin/ansible-playbook -i ansible/inventory/oci.ini \
-              ansible/uat.yml \
+            export ANSIBLE_SSH_ARGS="-i ${SSH_KEY_PATH} -o StrictHostKeyChecking=accept-new"
+            export ANSIBLE_REMOTE_USER=${ANSIBLE_REMOTE_USER}
+
+            ${VENV_ACTIVATE} -i ${ANSIBLE_INVENTORY} ansible/uat.yml \
               --limit uat \
               --tags uat_site \
-              --extra-vars "uat_site_custom_image=iad.ocir.io/idtijq8cx4jl/uat-site:${DEPLOY_TAG} uat_site_image_tag=${DEPLOY_TAG}" \
-              --vault-password-file "$VAULT_PASS_FILE"
+              --extra-vars "uat_site_custom_image=${OCIR_REPO}:${IMAGE_TAG} \
+                            uat_site_image_tag=${IMAGE_TAG}" \
+              --vault-password-file "${VAULT_PASS_FILE}"
           '''
         }
       }
+
       post {
         always {
-          sh 'rm -f /var/jenkins_home/.jenkins_self_deploy || true'
-        }
-        success {
-          script {
-            echo "✅ UAT deployment completed: iad.ocir.io/idtijq8cx4jl/uat-site:${DEPLOY_TAG}"
-            notifySlack("🚀 Version ${DEPLOY_TAG} published on *UAT* environment and is ready for testing.")
-          }
-        }
-        failure {
-          script {
-            echo "❌ Pipeline failed. Check the logs for troubleshooting."
-            notifySlack("❌ Jenkins UAT pipeline failed for *${env.JOB_NAME}*.")
-          }
+          sh 'rm -f ${JENKINS_MARKER} || true'
         }
       }
     }
   }
-}
 
-def notifySlack(String msg) {
-  withCredentials([string(credentialsId: 'slack-webhook-jenkins', variable: 'SLACK_URL')]) {
-    writeFile file: 'slack_payload.json', text: """{ "text": "${msg}" }"""
-    sh '''
-      set -e
-      cat slack_payload.json | curl -s -X POST -H "Content-type: application/json" -d @- "$SLACK_URL"
-    '''
+  post {
+    success {
+      echo "✅ UAT deployment completed: ${OCIR_REPO}:${env.IMAGE_TAG}"
+      script {
+        sendSlackNotification("🚀 Version ${env.IMAGE_TAG} published on *UAT* environment and is ready for testing.")
+      }
+    }
+    failure {
+      echo "❌ Pipeline failed. Check the logs for troubleshooting."
+      script {
+        sendSlackNotification("❌ Jenkins UAT pipeline failed for ${env.JOB_NAME}.")
+      }
+    }
   }
 }
