@@ -1,14 +1,13 @@
-// Slack notification helper function
-// Uses secure credential ID 'slack-webhook-jenkins' to access the webhook URL
+// Slack notification helper function (safe version)
 def sendSlackNotification(String message) {
   withCredentials([string(credentialsId: 'slack-webhook-jenkins', variable: 'SLACK_WEBHOOK_URL')]) {
-    script {
-      sh """
-        curl -X POST -H "Content-type: application/json" \\
-          --data '{"text": "${message}"}' \\
-          "${SLACK_WEBHOOK_URL}"
-      """
-    }
+    writeFile file: 'slack_payload.json', text: """{ "text": "${message}" }"""
+    sh '''
+      set -e
+      curl -X POST -H "Content-type: application/json" \
+        --data @slack_payload.json \
+        "$SLACK_WEBHOOK_URL"
+    '''
   }
 }
 
@@ -103,11 +102,15 @@ pipeline {
   post {
     success {
       echo "✅ UAT deployment completed: ${OCIR_REPO}:${env.IMAGE_TAG}"
-      sendSlackNotification("🚀 Version ${env.IMAGE_TAG} published on *UAT* environment and is ready for testing.")
+      script {
+        sendSlackNotification("🚀 Version ${env.IMAGE_TAG} published on *UAT* environment and is ready for testing.")
+      }
     }
     failure {
       echo "❌ Pipeline failed. Check the logs for troubleshooting."
-      sendSlackNotification("❌ Jenkins UAT pipeline failed for ${env.JOB_NAME}.")
+      script {
+        sendSlackNotification("❌ Jenkins UAT pipeline failed for ${env.JOB_NAME}.")
+      }
     }
   }
 }
