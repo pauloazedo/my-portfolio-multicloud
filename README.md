@@ -1,4 +1,5 @@
-# my-portfolio-oci-devops
+
+# my-portfolio-multicloud
 
 ![Terraform](https://img.shields.io/badge/Terraform-v1.4+-623CE4?logo=terraform&logoColor=white)
 ![Ansible](https://img.shields.io/badge/Ansible-Automation-EE0000?logo=ansible)
@@ -6,56 +7,57 @@
 ![OCI](https://img.shields.io/badge/Oracle%20Cloud-Infrastructure-F80000?logo=oracle)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
-A fully automated, production-ready infrastructure stack to host a personal technical portfolio on Oracle Cloud Infrastructure (OCI), leveraging Terraform, Ansible, Jenkins, and modern DevOps practices.
+A production-grade, fully automated DevOps infrastructure stack for hosting a personal technical portfolio. This project demonstrates multi-cloud provisioning, automated Docker deployments, TLS security, and CI/CD pipelines using Terraform, Ansible, and Jenkins.
 
 ---
 
 ## Table of Contents
 
-1. [Project Overview](#project-overview)
-2. [Architecture Diagram](#architecture-diagram)
+1. [Overview](#overview)
+2. [Architecture](#architecture)
 3. [Technology Stack](#technology-stack)
 4. [Repository Structure](#repository-structure)
-5. [Getting Started](#getting-started)
-6. [Infrastructure Provisioning (Terraform)](#infrastructure-provisioning-terraform)
-7. [Configuration Management (Ansible)](#configuration-management-ansible)
-8. [CI/CD Pipeline](#cicd-pipeline)
-9. [Monitoring & Logging (Planned)](#monitoring--logging-planned)
-10. [Security Considerations](#security-considerations)
-11. [Portfolio Website](#portfolio-website)
-12. [Future Improvements](#future-improvements)
-13. [License](#license)
+5. [Features](#features)
+6. [Getting Started](#getting-started)
+7. [Infrastructure Provisioning](#infrastructure-provisioning)
+8. [Configuration Management](#configuration-management)
+9. [CI/CD Pipeline](#cicd-pipeline)
+10. [TLS & Security](#tls--security)
+11. [Slack Integration](#slack-integration)
+12. [Live Sites](#live-sites)
+13. [Future Improvements](#future-improvements)
+14. [License](#license)
 
 ---
 
-## Project Overview
+## Overview
 
-A full-stack, containerized DevOps showcase hosted on OCI, demonstrating automation, IaC, CI/CD, and security best practices for modern infrastructure projects.
+This project showcases a modern, automated infrastructure to host a personal portfolio website. It supports UAT and PROD deployments, includes a Jenkins-based CI/CD pipeline, and adheres to security best practices.
 
 ---
 
-## Architecture Diagram
+## Architecture
 
-> _[Insert your architecture diagram here – you can link a PNG or embed a markdown image]_  
-> Suggested components:
-> - OCI compute, networking, Vault
-> - Terraform + Ansible flows
-> - Jenkins pipeline steps
-> - UAT and PROD targets
-> - Certbot + NGINX SSL routing
+> Architecture diagram pending. Suggested components:
+> - OCI compute + block volume
+> - Jenkins in Docker with Ansible automation
+> - Cloudflare DNS
+> - Certbot + NGINX TLS
+> - UAT and PROD deployments with blue/green strategy
+> - Slack certificate alerts
 
 ---
 
 ## Technology Stack
 
-- **Cloud**: Oracle Cloud Infrastructure (OCI)
+- **Cloud**: OCI (primary), with support for AWS, Azure, GCP
 - **IaC**: Terraform
 - **Automation**: Ansible
-- **CI/CD**: Jenkins
-- **Containerization**: Docker
-- **DNS**: Cloudflare
-- **Security**: iptables, Fail2Ban, OCI Vault
+- **CI/CD**: Jenkins (Dockerized)
+- **App Runtime**: Docker
 - **Frontend**: React + Next.js + Tailwind CSS
+- **DNS**: Cloudflare
+- **Security**: Fail2Ban, iptables, Certbot (HTTPS)
 
 ---
 
@@ -63,101 +65,125 @@ A full-stack, containerized DevOps showcase hosted on OCI, demonstrating automat
 
 ```
 .
-├── my-portfolio/
-│   └── frontend/         # [Next.js website — see full details here](my-portfolio/frontend/README.md)
-├── terraform/            # OCI provisioning (VCNs, instances, DNS)
-├── ansible/              # Automation roles (Jenkins, NGINX, hardening, etc.)
-├── Jenkinsfile           # CI/CD orchestrator
-├── run.sh                # Automation entry point
+├── frontend/                  # React/Next.js portfolio site
+├── terraform/oci/            # OCI Terraform infrastructure
+├── ansible/                  # Ansible roles (Jenkins, NGINX, etc.)
+├── Jenkinsfile               # GitHub → Jenkins pipeline
+├── run.sh                    # Combined Terraform + Ansible runner
 └── README.md
 ```
 
 ---
 
+## Features
+
+- Multi-cloud inventory (OCI, AWS, Azure, GCP)
+- Jenkins in Docker with persistent OCI Block Volume
+- UAT fallback container if no image available
+- PROD blue/green deployment with routing control
+- Slack alerts for Certbot certificate renewals
+- Automatic TLS via Let's Encrypt
+- Secure by default: no root containers, hardened SSH, IP restrictions
+- Secrets stored in encrypted Ansible vault (`all.secrets.yml`)
+
+---
+
 ## Getting Started
 
-### Prerequisites
+### Requirements
 
+- Python 3 + `oci` SDK
 - OCI CLI
 - Terraform (>= 1.4)
 - Ansible
-- SSH Key Pair
-- Python 3 with `oci` SDK
+- SSH key pair
 
 ### Quick Start
 
 ```bash
-git clone https://github.com/youruser/my-portfolio-oci-devops.git
-cd my-portfolio-oci-devops
-./run.sh            # runs terraform + ansible playbook
+git clone https://github.com/pauloazedo/my-portfolio-multicloud.git
+cd my-portfolio-multicloud
+./run.sh
 ```
 
-> Before running, configure your `terraform.tfvars` and OCI Vault secrets.
+Configure `terraform.tfvars` and `ansible/group_vars/*` files before running.
 
 ---
 
-## Infrastructure Provisioning (Terraform)
+## Infrastructure Provisioning
 
-- UAT and PROD environments defined via separate `.tf` files
-- Subnets, compute, and DNS zones provisioned dynamically
-- Cloudflare DNS integration for automated IP registration
+- OCI compute instances for UAT and PROD
+- Subnet and DNS setup per environment
+- OCI Block Volume for Jenkins persistence
+- Terraform separated by environment
 
 ---
 
-## Configuration Management (Ansible)
+## Configuration Management
 
-- Roles for:
-  - `jenkins`: Dockerized Jenkins setup with admin automation
-  - `nginx`: Reverse proxy + HTTPS with Let's Encrypt
-  - `hardening`: iptables + Fail2Ban security baseline
-  - `uat_site` and `prod_site`: Docker deployment of frontend
+- **Jenkins Role**:
+  - Installs Jenkins in Docker
+  - Injects admin + guest users
+  - Installs plugins via `plugins.txt`
+  - Mounts persistent volume
+
+- **NGINX Role**:
+  - Reverse proxy to Docker containers
+  - HTTP → HTTPS redirects
+  - TLS automation with Certbot
+
+- **Fail2Ban & iptables**: part of `hardening` role
+
+- **Site Roles** (`uat_site`, `prod_site`):
+  - Pull Docker image
+  - Run fallback if missing
+  - PROD: Blue/green deployment with image tagging
 
 ---
 
 ## CI/CD Pipeline
 
-- Jenkins pulls from GitHub on commit
-- Builds Next.js site via `npm run build`
-- Optionally pushes Docker images to OCI Artifact Registry
-- Auto-deploys to UAT or PROD using Ansible
+- Jenkins polls GitHub
+- Build triggered on commit
+- `uat_site` is deployed immediately
+- `prod_site` uses blue/green with manual promotion
+- All deployments run via Ansible over SSH
 
 ---
 
-## Monitoring & Logging (Planned)
+## TLS & Security
 
-Planned additions:
-- Prometheus node exporter
-- NGINX and Jenkins logging
-- Central log aggregation with Loki or fluentd
-
----
-
-## Security Considerations
-
-- SSH hardened
-- Secrets stored in OCI Vault
-- No containers run as root
-- HTTPS enforced across all endpoints
+- Certbot auto-issues TLS certificates for all services
+- NGINX configured per domain
+- Fail2Ban protects SSH/HTTP/HTTPS
+- iptables default-deny policies enforced
 
 ---
 
-## Portfolio Website
+## Slack Integration
 
-- Fully described in [`my-portfolio/frontend/README.md`](my-portfolio/frontend/README.md)
-- Live UAT: `https://oci.uat.pauloazedo.dev`
-- Live PROD: `https://oci.prod.pauloazedo.dev`
+- Certbot sends renewal events to Slack `#certificates`
+- Slack App configured via manifest YAML
+
+---
+
+## Live Sites
+
+- UAT: [https://oci.uat.pauloazedo.dev](https://oci.uat.pauloazedo.dev)
+- PROD: [https://oci.prod.pauloazedo.dev](https://oci.prod.pauloazedo.dev)
+- Website root: [https://www.pauloazedo.dev](https://www.pauloazedo.dev)
 
 ---
 
 ## Future Improvements
 
-- Add CI steps for `terraform plan` and `terraform apply`
-- Add Molecule role testing
-- Integrate OCI notifications or Slack alerts
-- Support for additional cloud providers (GCP, AWS)
+- Add Molecule testing for Ansible roles
+- Add CI for Terraform plan + validate
+- Multi-region support
+- More advanced observability (Loki, Prometheus)
 
 ---
 
 ## License
 
-MIT License — fork, reuse, improve.
+MIT License — feel free to fork, contribute, or use it as a DevOps reference.

@@ -1,0 +1,141 @@
+// Slack notification helper function
+// Uses secure credential ID 'slack-webhook-jenkins' to access the webhook URL
+def sendSlackNotification(String message) {
+  withCredentials([string(credentialsId: 'slack-webhook-jenkins', variable: 'SLACK_WEBHOOK_URL')]) {
+    sh """
+      curl -X POST -H 'Content-type: application/json' \
+      --data '{"text": "${message}"}' \
+      $SLACK_WEBHOOK_URL
+    """
+  }
+}
+
+pipeline {
+  agent any
+
+  environment {
+    ANSIBLE_INVENTORY     = 'ansible/inventory/oci.ini'
+    OCIR_REPO             = 'iad.ocir.io/idtijq8cx4jl/prod-site'
+    SSH_KEY_PATH          = '/var/jenkins_home/.ssh/id_rsa'
+    ANSIBLE_REMOTE_USER   = 'devops'
+    ANSIBLE_TARGET_HOST   = 'oci.prod.pauloazedo.dev'
+    JENKINS_MARKER        = '/var/jenkins_home/.jenkins_self_deploy'
+    FRONTEND_SRC_DIR      = './my-portfolio/frontend/'
+    FRONTEND_DST_DIR      = '/home/devops/frontend'
+    IMAGE_TAG_FILE        = 'image_tag.txt'
+    VENV_ACTIVATE         = '/home/jenkins/venv/bin/ansible-playbook'
+  }
+
+  options {
+    timestamps()
+    ansiColor('xterm')
+  }
+
+  stages {
+
+    stage('Checkout SCM') {
+      steps {
+        checkout scm
+      }
+    }
+
+    stage('Checkout main branch') {
+      steps {
+        git branch: 'main', url: 'https://github.com/pauloazedo/my-portfolio-multicloud.git'
+      }
+    }
+
+    // Dynamically use Git tag if available, otherwise fallback to Git SHA
+    stage('Generate Image Tag') {
+      steps {
+        script {
+          def tag = sh(script: "git describe --tags --abbrev=0 || true", returnStdout: true).trim()
+          if (tag == '') {
+            tag = sh(script: "git rev-parse --short HEAD", returnStdout: true).trim()
+          }
+          env.IMAGE_TAG = tag
+          writeFile file: IMAGE_TAG_FILE, text: env.IMAGE_TAG
+        }
+      }
+    }
+
+    stage('Sync Frontend to PROD (BLUE)') {
+      steps {
+        sh '''
+          set -e
+          rsync -az --delete \
+            -e "ssh -i ${SSH_KEY_PATH} -o StrictHostKeyChecking=accept-new" \
+            ${FRONTEND_SRC_DIR} ${ANSIBLE_REMOTE_USER}@${ANSIBLE_TARGET_HOST}:${FRONTEND_DST_DIR}
+        '''
+      }
+    }
+
+    stage('Deploy BLUE Container to PROD') {
+      steps {
+        withCredentials([file(credentialsId: 'ansible-vault-passfile', variable: 'VAULT_PASS_FILE')]) {
+          sh '''
+            set -e
+            echo '[INFO] Creating Jenkins self-deployment marker'
+            touch ${JENKINS_MARKER}
+
+            export ANSIBLE_SSH_ARGS="-i ${SSH_KEY_PATH} -o StrictHostKeyChecking=accept-new"
+            export ANSIBLE_REMOTE_USER=${ANSIBLE_REMOTE_USER}
+
+            ${VENV_ACTIVATE} -i ${ANSIBLE_INVENTORY} ansible/prod.yml \
+              --limit prod \
+              --tags prod_site \
+              --extra-vars "prod_site_custom_image=${OCIR_REPO}:${IMAGE_TAG} \
+                            prod_site_image_tag=blue \
+                            prod_site_color=blue" \
+              --vault-password-file "${VAULT_PASS_FILE}"
+          '''
+        }
+      }
+      post {
+        always {
+          sh 'rm -f ${JENKINS_MARKER} || true'
+        }
+      }
+    }
+
+    stage('Manual Approval: Promote BLUE to GREEN') {
+      steps {
+        input message: "Promote blue container to green in PROD?"
+      }
+    }
+
+    stage('Deploy GREEN Container to PROD') {
+      steps {
+        withCredentials([file(credentialsId: 'ansible-vault-passfile', variable: 'VAULT_PASS_FILE')]) {
+          sh '''
+            set -e
+            echo '[INFO] Tagging image for GREEN deployment'
+
+            export ANSIBLE_SSH_ARGS="-i ${SSH_KEY_PATH} -o StrictHostKeyChecking=accept-new"
+            export ANSIBLE_REMOTE_USER=${ANSIBLE_REMOTE_USER}
+
+            ${VENV_ACTIVATE} -i ${ANSIBLE_INVENTORY} ansible/prod.yml \
+              --limit prod \
+              --tags prod_site \
+              --extra-vars "prod_site_custom_image=${OCIR_REPO}:${IMAGE_TAG} \
+                            prod_site_image_tag=green \
+                            prod_site_color=green" \
+              --vault-password-file "${VAULT_PASS_FILE}"
+          '''
+        }
+      }
+    }
+  }
+
+  post {
+    success {
+      echo "✅ PROD deployment completed: ${OCIR_REPO}:${env.IMAGE_TAG} promoted to GREEN"
+      sendSlackNotification("🚀 Version ${env.IMAGE_TAG} published on *PROD* (blue container). Awaiting manual approval to promote to *green*.")
+    }
+    failure {
+      echo "❌ Pipeline failed. Check the logs for troubleshooting."
+      sendSlackNotification("❌ Jenkins PROD pipeline failed for ${env.JOB_NAME}.")
+    }
+  }
+}
+ok, 
