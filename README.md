@@ -1,5 +1,5 @@
 
-# my-portfolio-oci-devops
+# my-portfolio-multicloud
 
 ![Terraform](https://img.shields.io/badge/Terraform-v1.4+-623CE4?logo=terraform&logoColor=white)
 ![Ansible](https://img.shields.io/badge/Ansible-Automation-EE0000?logo=ansible)
@@ -101,8 +101,8 @@ This project showcases a modern, automated infrastructure to host a personal por
 ### Quick Start
 
 ```bash
-git clone https://github.com/youruser/my-portfolio-oci-devops.git
-cd my-portfolio-oci-devops
+git clone https://github.com/pauloazedo/my-portfolio-multicloud.git
+cd my-portfolio-multicloud
 ./run.sh
 ```
 

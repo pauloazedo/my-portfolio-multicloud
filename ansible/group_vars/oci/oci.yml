@@ -51,7 +51,7 @@ cloud_volume_filesystem_type: "ext4"
 uat_site_container: "uat-site"
 uat_site_port:      3000
 
-uat_site_git_repo:           "https://github.com/pauloazedo/my-portfolio-oci-devops.git"
+uat_site_git_repo:           "https://github.com/pauloazedo/my-portfolio-multicloud.git"
 uat_site_git_branch:         "uat"
 uat_site_dockerfile_path:    "my-portfolio/frontend"
 uat_site_fallback_image:     "{{ uat_site_waiting_image }}"
