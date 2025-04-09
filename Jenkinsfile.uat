@@ -1,5 +1,16 @@
 // Jenkinsfile.uat
 
+// Early exit if not a Git tag
+if (!env.GIT_BRANCH?.startsWith("refs/tags/")) {
+  echo "⏭️ Skipping build: not a tag push (GIT_BRANCH=${env.GIT_BRANCH})"
+  return
+}
+
+// Optional debug log
+echo "🧠 Pipeline triggered by:"
+echo "→ GIT_BRANCH = ${env.GIT_BRANCH}"
+echo "→ GIT_COMMIT  = ${env.GIT_COMMIT}"
+
 pipeline {
   agent any
 
@@ -24,18 +35,25 @@ pipeline {
 
   stages {
 
-    stage('Detect Git Tag Context') {
+    stage('Checkout Specific Tag') {
       steps {
         script {
-          def rawRef = env.GIT_BRANCH ?: ''
-          if (!rawRef.startsWith("refs/tags/")) {
-            error "❌ Ref is not a tag (got '${rawRef}') — refusing to continue."
-          }
-          def tag = rawRef.replaceFirst(/^refs\/tags\//, '').trim()
-          env.IMAGE_TAG = tag
-          writeFile file: IMAGE_TAG_FILE, text: tag
-          echo "📌 Deploying tag: ${tag}"
+          def tagName = env.GIT_BRANCH.replaceFirst(/^refs\/tags\//, '')
+          echo "📌 Tag detected: ${tagName}"
+          env.IMAGE_TAG = tagName
         }
+
+        checkout([
+          $class: 'GitSCM',
+          branches: [[name: "refs/tags/${env.IMAGE_TAG}"]],
+          userRemoteConfigs: [[
+            url: 'https://github.com/pauloazedo/my-portfolio-multicloud.git',
+            credentialsId: 'github-credentials'
+          ]],
+          doGenerateSubmoduleConfigurations: false,
+          extensions: [[$class: 'CleanCheckout']],
+          submoduleCfg: []
+        ])
       }
     }
 
@@ -81,19 +99,22 @@ pipeline {
 
   post {
     success {
+      echo "✅ UAT deployment completed: ${OCIR_REPO}:${env.IMAGE_TAG}"
       slackSend (
         channel: '#jenkins_notifications',
         color: 'good',
-        message: """✅ Version `${env.IMAGE_TAG}` was published to *UAT* and is ready for user acceptance testing.
+        message: """🚀 Version `${env.IMAGE_TAG}` was published to *UAT* and is ready for user acceptance testing.
 🔗 <${env.BUILD_URL}|View Jenkins Build>
 🌐 <${env.UAT_APP_URL}|Open UAT Application>"""
       )
     }
+
     failure {
+      echo "❌ Pipeline failed. Check the logs for troubleshooting."
       slackSend (
         channel: '#jenkins_notifications',
         color: 'danger',
-        message: "❌ *UAT Pipeline FAILED* for tag `${env.IMAGE_TAG}`.\n🔗 <${env.BUILD_URL}|View Jenkins Build>"
+        message: "❌ *UAT Pipeline FAILED* for `${env.JOB_NAME}`.\n🔗 <${env.BUILD_URL}|View Jenkins Build>"
       )
     }
   }
