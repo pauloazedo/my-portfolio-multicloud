@@ -1,15 +1,18 @@
 // Jenkinsfile.uat
 
-// Log key metadata for debugging
+// Run only for Git tag pushes (e.g., v0.0.7)
+def tagRef = sh(script: "git describe --tags --exact-match || true", returnStdout: true).trim()
+
 echo "🧠 Debug Info:"
-echo "→ GIT_BRANCH = ${env.GIT_BRANCH}"
+echo "→ GIT_TAG = ${tagRef}"
 echo "→ GIT_COMMIT = ${env.GIT_COMMIT}"
 
-// Run only for Git tag refs (e.g., refs/tags/v0.0.7)
-if (!env.GIT_BRANCH?.startsWith("refs/tags/")) {
-  echo "⏭️ Skipping build: not a tag (GIT_BRANCH=${env.GIT_BRANCH})"
+if (!tagRef?.startsWith('v')) {
+  echo "⏭️ Skipping build: not a tag push (found: ${tagRef})"
   return
 }
+
+env.IMAGE_TAG = tagRef
 
 pipeline {
   agent any
@@ -40,17 +43,11 @@ pipeline {
       }
     }
 
-    stage('Extract Tag Name') {
+    stage('Save Image Tag') {
       steps {
         script {
-          def rawRef = env.GIT_BRANCH ?: ''
-          def tag = rawRef.replaceFirst(/^refs\/tags\//, '').trim()
-          if (!tag) {
-            error("Could not determine tag name from GIT_BRANCH=${rawRef}")
-          }
-          env.IMAGE_TAG = tag
-          writeFile file: IMAGE_TAG_FILE, text: tag
-          echo "📝 Using tag: ${tag}"
+          writeFile file: IMAGE_TAG_FILE, text: env.IMAGE_TAG
+          echo "📝 Using tag: ${env.IMAGE_TAG}"
         }
       }
     }
