@@ -1,3 +1,11 @@
+// Jenkinsfile.uat
+
+// Run only for Git tag refs (e.g., refs/tags/v0.0.5)
+if (!env.GIT_BRANCH?.startsWith("refs/tags/")) {
+  echo "⏭️ Skipping build: not a tag (GIT_BRANCH=${env.GIT_BRANCH})"
+  return
+}
+
 pipeline {
   agent any
 
@@ -21,7 +29,6 @@ pipeline {
   }
 
   stages {
-
     stage('Checkout SCM') {
       steps {
         checkout scm
