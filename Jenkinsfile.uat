@@ -93,7 +93,7 @@ pipeline {
       slackSend (
         channel: '#jenkins_notifications',
         color: 'good',
-        message: """🚀 Version `${env.IMAGE_TAG}` was published to *UAT* and is ready for testing.
+        message: """🚀 Version `${env.IMAGE_TAG}` was published to *UAT* and is ready for user acceptance testing.
 🔗 <${env.BUILD_URL}|View Jenkins Build>
 🌐 <${env.UAT_APP_URL}|Open UAT Application>"""
       )
