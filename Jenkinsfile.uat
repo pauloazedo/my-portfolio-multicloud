@@ -1,3 +1,5 @@
+// Jenkinsfile.uat
+
 pipeline {
   agent any
 
@@ -21,27 +23,22 @@ pipeline {
   }
 
   stages {
-    stage('Checkout & Verify Tag') {
+
+    stage('Checkout Specific Tag') {
       steps {
-        checkout scm
-
         script {
-          def tagRef = sh(script: "git describe --tags --exact-match || true", returnStdout: true).trim()
-
-          echo "🧠 Debug Info:"
-          echo "→ GIT_TAG = ${tagRef}"
-          echo "→ GIT_COMMIT = ${env.GIT_COMMIT}"
-
-          if (!tagRef?.startsWith('v')) {
-            echo "⏭️ Skipping build: not a tag push (found: ${tagRef})"
-            currentBuild.result = 'SUCCESS'
-            error("Not a version tag build. Exiting.")
-          }
-
-          env.IMAGE_TAG = tagRef
-          writeFile file: IMAGE_TAG_FILE, text: env.IMAGE_TAG
-          echo "📝 Using tag: ${env.IMAGE_TAG}"
+          def tagName = sh(script: "git ls-remote --tags origin | tail -n1 | sed 's#.*/##'", returnStdout: true).trim()
+          echo "📌 Detected latest tag: ${tagName}"
+          env.IMAGE_TAG = tagName
         }
+
+        checkout([$class: 'GitSCM',
+          branches: [[name: "refs/tags/${env.IMAGE_TAG}"]],
+          userRemoteConfigs: [[url: 'https://github.com/pauloazedo/my-portfolio-multicloud.git', credentialsId: 'github-credentials']],
+          doGenerateSubmoduleConfigurations: false,
+          extensions: [[$class: 'CleanCheckout']],
+          submoduleCfg: []
+        ])
       }
     }
 
