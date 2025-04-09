@@ -1,19 +1,5 @@
 // Jenkinsfile.uat
 
-// Run only for Git tag pushes (e.g., v0.0.7)
-def tagRef = sh(script: "git describe --tags --exact-match || true", returnStdout: true).trim()
-
-echo "🧠 Debug Info:"
-echo "→ GIT_TAG = ${tagRef}"
-echo "→ GIT_COMMIT = ${env.GIT_COMMIT}"
-
-if (!tagRef?.startsWith('v')) {
-  echo "⏭️ Skipping build: not a tag push (found: ${tagRef})"
-  return
-}
-
-env.IMAGE_TAG = tagRef
-
 pipeline {
   agent any
 
@@ -37,56 +23,73 @@ pipeline {
   }
 
   stages {
-    stage('Checkout Source') {
+    stage('Checkout & Verify Tag') {
       steps {
-        checkout scm
-      }
-    }
+        node {
+          checkout scm
 
-    stage('Save Image Tag') {
-      steps {
-        script {
-          writeFile file: IMAGE_TAG_FILE, text: env.IMAGE_TAG
-          echo "📝 Using tag: ${env.IMAGE_TAG}"
+          script {
+            def tagRef = sh(script: "git describe --tags --exact-match || true", returnStdout: true).trim()
+
+            echo "🧠 Debug Info:"
+            echo "→ GIT_TAG = ${tagRef}"
+            echo "→ GIT_COMMIT = ${env.GIT_COMMIT}"
+
+            if (!tagRef?.startsWith('v')) {
+              echo "⏭️ Skipping build: not a tag push (found: ${tagRef})"
+              currentBuild.result = 'SUCCESS'
+              return
+            }
+
+            env.IMAGE_TAG = tagRef
+            writeFile file: IMAGE_TAG_FILE, text: env.IMAGE_TAG
+            echo "📝 Using tag: ${env.IMAGE_TAG}"
+          }
         }
       }
     }
 
     stage('Sync Frontend to UAT') {
       steps {
-        sh '''
-          set -e
-          rsync -az --delete \
-            -e "ssh -i ${SSH_KEY_PATH} -o StrictHostKeyChecking=accept-new" \
-            ${FRONTEND_SRC_DIR} ${ANSIBLE_REMOTE_USER}@${ANSIBLE_TARGET_HOST}:${FRONTEND_DST_DIR}
-        '''
+        node {
+          sh '''
+            set -e
+            rsync -az --delete \
+              -e "ssh -i ${SSH_KEY_PATH} -o StrictHostKeyChecking=accept-new" \
+              ${FRONTEND_SRC_DIR} ${ANSIBLE_REMOTE_USER}@${ANSIBLE_TARGET_HOST}:${FRONTEND_DST_DIR}
+          '''
+        }
       }
     }
 
     stage('Deploy via Ansible') {
       steps {
-        withCredentials([file(credentialsId: 'ansible-vault-passfile', variable: 'VAULT_PASS_FILE')]) {
-          sh '''
-            set -e
-            echo '[INFO] Creating Jenkins self-deployment marker'
-            touch ${JENKINS_MARKER}
+        node {
+          withCredentials([file(credentialsId: 'ansible-vault-passfile', variable: 'VAULT_PASS_FILE')]) {
+            sh '''
+              set -e
+              echo '[INFO] Creating Jenkins self-deployment marker'
+              touch ${JENKINS_MARKER}
 
-            export ANSIBLE_SSH_ARGS="-i ${SSH_KEY_PATH} -o StrictHostKeyChecking=accept-new"
-            export ANSIBLE_REMOTE_USER=${ANSIBLE_REMOTE_USER}
+              export ANSIBLE_SSH_ARGS="-i ${SSH_KEY_PATH} -o StrictHostKeyChecking=accept-new"
+              export ANSIBLE_REMOTE_USER=${ANSIBLE_REMOTE_USER}
 
-            ${VENV_ACTIVATE} -i ${ANSIBLE_INVENTORY} ansible/uat.yml \
-              --limit uat \
-              --tags uat_site \
-              --extra-vars "uat_site_custom_image=${OCIR_REPO}:${IMAGE_TAG} \
-                            uat_site_image_tag=${IMAGE_TAG}" \
-              --vault-password-file "${VAULT_PASS_FILE}"
-          '''
+              ${VENV_ACTIVATE} -i ${ANSIBLE_INVENTORY} ansible/uat.yml \
+                --limit uat \
+                --tags uat_site \
+                --extra-vars "uat_site_custom_image=${OCIR_REPO}:${IMAGE_TAG} \
+                              uat_site_image_tag=${IMAGE_TAG}" \
+                --vault-password-file "${VAULT_PASS_FILE}"
+            '''
+          }
         }
       }
 
       post {
         always {
-          sh 'rm -f ${JENKINS_MARKER} || true'
+          node {
+            sh 'rm -f ${JENKINS_MARKER} || true'
+          }
         }
       }
     }
