@@ -1,12 +1,11 @@
-// Slack notification helper function
-// Uses secure credential ID 'slack-webhook-jenkins' to access the webhook URL
+// Slack notification helper
 def sendSlackNotification(String message) {
   withCredentials([string(credentialsId: 'slack-webhook-jenkins', variable: 'SLACK_WEBHOOK_URL')]) {
     script {
       sh """
-        curl -X POST -H "Content-type: application/json" \\
+        curl -s -X POST -H "Content-type: application/json" \\
           --data '{"text": "${message}"}' \\
-          "${SLACK_WEBHOOK_URL}"
+          "\${SLACK_WEBHOOK_URL}"
       """
     }
   }
@@ -26,6 +25,8 @@ pipeline {
     FRONTEND_DST_DIR      = '/home/devops/frontend'
     IMAGE_TAG_FILE        = 'image_tag.txt'
     VENV_ACTIVATE         = '/home/jenkins/venv/bin/ansible-playbook'
+    PROD_BLUE_URL         = 'https://oci.prod.pauloazedo.dev/blue'
+    PROD_LIVE_URL         = 'https://www.pauloazedo.dev'
   }
 
   options {
@@ -92,16 +93,29 @@ pipeline {
           '''
         }
       }
+
       post {
         always {
           sh 'rm -f ${JENKINS_MARKER} || true'
+        }
+        success {
+          echo "✅ BLUE deployment completed: ${OCIR_REPO}:${env.IMAGE_TAG}"
+          script {
+            sendSlackNotification("""🚀 *New version* `${env.IMAGE_TAG}` has been deployed to the *preview environment (BLUE)*.
+
+🔍 Review here: <${env.PROD_BLUE_URL}|Preview the app>
+🛠️ Jenkins build: <${env.BUILD_URL}|View build log>
+
+🧪 *To make this version live*, manual approval is required.
+👉 <${env.BUILD_URL}|Click here to approve and promote to production>""")
+          }
         }
       }
     }
 
     stage('Manual Approval: Promote BLUE to GREEN') {
       steps {
-        input message: "Promote blue container to green in PROD?"
+        input message: "Promote BLUE container to GREEN (LIVE)?"
       }
     }
 
@@ -125,28 +139,26 @@ pipeline {
           '''
         }
       }
+
+      post {
+        success {
+          echo "✅ GREEN deployment completed: ${OCIR_REPO}:${env.IMAGE_TAG} is now live"
+          script {
+            sendSlackNotification("""✅ Version `${env.IMAGE_TAG}` is now *LIVE* in production.
+
+🌐 Visit the app: <${env.PROD_LIVE_URL}|Open www.pauloazedo.dev>
+🛠️ Jenkins build: <${env.BUILD_URL}|View build log>""")
+          }
+        }
+      }
     }
   }
 
   post {
-    success {
-      echo "✅ PROD deployment completed: ${OCIR_REPO}:${env.IMAGE_TAG} promoted to GREEN"
-      script {
-        try {
-          sendSlackNotification("🚀 Version ${env.IMAGE_TAG} published on *PROD* (blue container). Awaiting manual approval to promote to *green*.")
-        } catch (err) {
-          echo "Slack notification failed: ${err.message}"
-        }
-      }
-    }
     failure {
       echo "❌ Pipeline failed. Check the logs for troubleshooting."
       script {
-        try {
-          sendSlackNotification("❌ Jenkins PROD pipeline failed for ${env.JOB_NAME}.")
-        } catch (err) {
-          echo "Slack notification failed: ${err.message}"
-        }
+        sendSlackNotification("❌ *PROD Pipeline FAILED* for `${env.JOB_NAME}`.\n🔗 <${env.BUILD_URL}|View Jenkins build>")
       }
     }
   }
