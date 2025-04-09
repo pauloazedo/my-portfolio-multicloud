@@ -1,6 +1,6 @@
 // Jenkinsfile.uat
 
-// Run only for Git tag refs (e.g., refs/tags/v0.0.5)
+// Run only for Git tag refs (e.g., refs/tags/v0.0.7)
 if (!env.GIT_BRANCH?.startsWith("refs/tags/")) {
   echo "⏭️ Skipping build: not a tag (GIT_BRANCH=${env.GIT_BRANCH})"
   return
@@ -29,27 +29,24 @@ pipeline {
   }
 
   stages {
-    stage('Checkout SCM') {
+
+    stage('Checkout Source') {
       steps {
         checkout scm
       }
     }
 
-    stage('Checkout uat branch') {
-      steps {
-        git branch: 'uat', url: 'https://github.com/pauloazedo/my-portfolio-multicloud.git'
-      }
-    }
-
-    stage('Generate Image Tag') {
+    stage('Extract Tag Name') {
       steps {
         script {
-          def tag = sh(script: "git describe --tags --abbrev=0 || true", returnStdout: true).trim()
+          // Extract just the tag name from the full ref (e.g., refs/tags/v0.0.7 -> v0.0.7)
+          def rawRef = env.GIT_BRANCH ?: ''
+          def tag = rawRef.replaceFirst(/^refs\/tags\//, '').trim()
           if (!tag) {
-            tag = sh(script: "git rev-parse --short HEAD", returnStdout: true).trim()
+            error("Could not determine tag name from GIT_BRANCH=${rawRef}")
           }
           env.IMAGE_TAG = tag
-          writeFile file: IMAGE_TAG_FILE, text: env.IMAGE_TAG
+          writeFile file: IMAGE_TAG_FILE, text: tag
         }
       }
     }
@@ -65,7 +62,7 @@ pipeline {
       }
     }
 
-    stage('Run Ansible Deployment') {
+    stage('Deploy via Ansible') {
       steps {
         withCredentials([file(credentialsId: 'ansible-vault-passfile', variable: 'VAULT_PASS_FILE')]) {
           sh '''
