@@ -1,33 +1,21 @@
-// Jenkinsfile.uat
-
-// Early exit if not a Git tag (safe + reliable check)
-def gitTag = sh(script: "git describe --tags --exact-match || true", returnStdout: true).trim()
-if (!gitTag || !gitTag.startsWith("v")) {
-  echo "⏭️ Skipping build: not a valid semantic version tag (got: '${gitTag}')"
-  return
-}
-env.IMAGE_TAG = gitTag
-
-// Optional debug log
-echo "🧠 Pipeline triggered by:"
-echo "→ IMAGE_TAG = ${env.IMAGE_TAG}"
-echo "→ GIT_COMMIT = ${env.GIT_COMMIT}"
-
 pipeline {
   agent any
 
   environment {
-    ANSIBLE_INVENTORY   = 'ansible/inventory/oci.ini'
-    OCIR_REPO           = 'iad.ocir.io/idtijq8cx4jl/uat-site'
-    SSH_KEY_PATH        = '/var/jenkins_home/.ssh/id_rsa'
-    ANSIBLE_REMOTE_USER = 'devops'
-    ANSIBLE_TARGET_HOST = 'oci.uat.pauloazedo.dev'
-    JENKINS_MARKER      = '/var/jenkins_home/.jenkins_self_deploy'
-    FRONTEND_SRC_DIR    = './my-portfolio/frontend/'
-    FRONTEND_DST_DIR    = '/home/devops/frontend'
-    IMAGE_TAG_FILE      = 'image_tag.txt'
-    VENV_ACTIVATE       = '/home/jenkins/venv/bin/ansible-playbook'
-    UAT_APP_URL         = 'https://oci.uat.pauloazedo.dev'
+    CLOUD_PROVIDER       = "${env.CLOUD_PROVIDER ?: 'undefined'}"
+    ANSIBLE_INVENTORY    = "ansible/inventory/${CLOUD_PROVIDER}.ini"
+    SSH_KEY_PATH         = '/var/jenkins_home/.ssh/id_rsa'
+    ANSIBLE_REMOTE_USER  = 'devops'
+    ANSIBLE_TARGET_HOST  = "${CLOUD_PROVIDER}.uat.pauloazedo.dev"
+    FRONTEND_SRC_DIR     = './my-portfolio/frontend/'
+    FRONTEND_DST_DIR     = '/home/devops/frontend'
+    IMAGE_TAG_FILE       = 'image_tag.txt'
+    VENV_ACTIVATE        = '/home/jenkins/venv/bin/ansible-playbook'
+    UAT_APP_URL          = "https://${CLOUD_PROVIDER}.uat.pauloazedo.dev"
+    OCIR_REPO            = CLOUD_PROVIDER == 'oci'
+                          ? 'iad.ocir.io/idtijq8cx4jl/uat-site'
+                          : 'aws_account_id.dkr.ecr.region.amazonaws.com/uat-site' // Replace with your actual ECR path
+    JENKINS_MARKER       = '/var/jenkins_home/.jenkins_self_deploy'
   }
 
   options {
@@ -36,6 +24,25 @@ pipeline {
   }
 
   stages {
+
+    stage('Validate Tag Trigger') {
+      steps {
+        script {
+          if (env.CLOUD_PROVIDER == 'undefined') {
+            error "❌ CLOUD_PROVIDER environment variable is not set. Aborting."
+          }
+
+          def tagName = sh(script: "git describe --tags --exact-match || true", returnStdout: true).trim()
+          if (!tagName || !tagName.startsWith("v")) {
+            echo "⏭️ Skipping build: not a valid semantic version tag (got: '${tagName}')"
+            currentBuild.result = 'NOT_BUILT'
+            return
+          }
+          env.IMAGE_TAG = tagName
+          echo "🧠 Pipeline triggered by tag: ${env.IMAGE_TAG} on ${env.CLOUD_PROVIDER.toUpperCase()}"
+        }
+      }
+    }
 
     stage('Checkout Specific Tag') {
       steps {
@@ -99,7 +106,7 @@ pipeline {
       slackSend (
         channel: '#jenkins_notifications',
         color: 'good',
-        message: """🚀 Version `${env.IMAGE_TAG}` was published to *UAT* and is ready for user acceptance testing.
+        message: """🚀 Version `${env.IMAGE_TAG}` was published to *UAT (${env.CLOUD_PROVIDER.toUpperCase()})* and is ready for user acceptance testing.
 🔗 <${env.BUILD_URL}|View Jenkins Build>
 🌐 <${env.UAT_APP_URL}|Open UAT Application>"""
       )
