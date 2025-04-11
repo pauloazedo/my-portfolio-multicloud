@@ -2,20 +2,18 @@ pipeline {
   agent any
 
   environment {
-    CLOUD_PROVIDER       = "${env.CLOUD_PROVIDER ?: 'undefined'}"
-    ANSIBLE_INVENTORY    = "ansible/inventory/${CLOUD_PROVIDER}.ini"
-    SSH_KEY_PATH         = '/var/jenkins_home/.ssh/id_rsa'
-    ANSIBLE_REMOTE_USER  = 'devops'
-    ANSIBLE_TARGET_HOST  = "${CLOUD_PROVIDER}.uat.pauloazedo.dev"
-    FRONTEND_SRC_DIR     = './my-portfolio/frontend/'
-    FRONTEND_DST_DIR     = '/home/devops/frontend'
-    IMAGE_TAG_FILE       = 'image_tag.txt'
-    VENV_ACTIVATE        = '/home/jenkins/venv/bin/ansible-playbook'
-    UAT_APP_URL          = "https://${CLOUD_PROVIDER}.uat.pauloazedo.dev"
-    OCIR_REPO            = CLOUD_PROVIDER == 'oci'
-                          ? 'iad.ocir.io/idtijq8cx4jl/uat-site'
-                          : 'aws_account_id.dkr.ecr.region.amazonaws.com/uat-site' // Replace with your actual ECR path
-    JENKINS_MARKER       = '/var/jenkins_home/.jenkins_self_deploy'
+    CLOUD_PROVIDER        = "${env.CLOUD_PROVIDER ?: 'undefined'}"
+    ANSIBLE_INVENTORY     = "ansible/inventory/${CLOUD_PROVIDER}.ini"
+    SSH_KEY_PATH          = '/var/jenkins_home/.ssh/id_rsa'
+    ANSIBLE_REMOTE_USER   = 'devops'
+    ANSIBLE_TARGET_HOST   = "${CLOUD_PROVIDER}.uat.pauloazedo.dev"
+    FRONTEND_SRC_DIR      = './my-portfolio/frontend/'
+    FRONTEND_DST_DIR      = '/home/devops/frontend'
+    IMAGE_TAG_FILE        = 'image_tag.txt'
+    VENV_ACTIVATE         = '/home/jenkins/venv/bin/ansible-playbook'
+    UAT_APP_URL           = "https://${CLOUD_PROVIDER}.uat.pauloazedo.dev"
+    OCIR_REPO             = ''  // Dynamically assigned in Init stage
+    JENKINS_MARKER        = '/var/jenkins_home/.jenkins_self_deploy'
   }
 
   options {
@@ -25,13 +23,33 @@ pipeline {
 
   stages {
 
+    stage('Init Environment') {
+      steps {
+        script {
+          if (!env.CLOUD_PROVIDER || env.CLOUD_PROVIDER == 'undefined') {
+            error "❌ CLOUD_PROVIDER environment variable is not set."
+          }
+
+          switch (env.CLOUD_PROVIDER) {
+            case 'oci':
+              env.OCIR_REPO = 'iad.ocir.io/idtijq8cx4jl/uat-site'
+              break
+            case 'aws':
+              env.OCIR_REPO = 'aws_account_id.dkr.ecr.region.amazonaws.com/uat-site' // Replace with real ECR
+              break
+            default:
+              error "❌ Unknown CLOUD_PROVIDER: ${env.CLOUD_PROVIDER}"
+          }
+
+          echo "🧭 Using CLOUD_PROVIDER=${env.CLOUD_PROVIDER}"
+          echo "📦 Using container repo: ${env.OCIR_REPO}"
+        }
+      }
+    }
+
     stage('Validate Tag Trigger') {
       steps {
         script {
-          if (env.CLOUD_PROVIDER == 'undefined') {
-            error "❌ CLOUD_PROVIDER environment variable is not set. Aborting."
-          }
-
           def tagName = sh(script: "git describe --tags --exact-match || true", returnStdout: true).trim()
           if (!tagName || !tagName.startsWith("v")) {
             echo "⏭️ Skipping build: not a valid semantic version tag (got: '${tagName}')"
