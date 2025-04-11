@@ -2,18 +2,13 @@ pipeline {
   agent any
 
   environment {
-    CLOUD_PROVIDER        = "${env.CLOUD_PROVIDER ?: 'undefined'}"
-    ANSIBLE_INVENTORY     = "ansible/inventory/${CLOUD_PROVIDER}.ini"
-    SSH_KEY_PATH          = '/var/jenkins_home/.ssh/id_rsa'
-    ANSIBLE_REMOTE_USER   = 'devops'
-    ANSIBLE_TARGET_HOST   = "${CLOUD_PROVIDER}.uat.pauloazedo.dev"
-    FRONTEND_SRC_DIR      = './my-portfolio/frontend/'
-    FRONTEND_DST_DIR      = '/home/devops/frontend'
-    IMAGE_TAG_FILE        = 'image_tag.txt'
-    VENV_ACTIVATE         = '/home/jenkins/venv/bin/ansible-playbook'
-    UAT_APP_URL           = "https://${CLOUD_PROVIDER}.uat.pauloazedo.dev"
-    OCIR_REPO             = ''  // Dynamically assigned in Init stage
-    JENKINS_MARKER        = '/var/jenkins_home/.jenkins_self_deploy'
+    SSH_KEY_PATH        = '/var/jenkins_home/.ssh/id_rsa'
+    ANSIBLE_REMOTE_USER = 'devops'
+    JENKINS_MARKER      = '/var/jenkins_home/.jenkins_self_deploy'
+    FRONTEND_SRC_DIR    = './my-portfolio/frontend/'
+    FRONTEND_DST_DIR    = '/home/devops/frontend'
+    IMAGE_TAG_FILE      = 'image_tag.txt'
+    VENV_ACTIVATE       = '/home/jenkins/venv/bin/ansible-playbook'
   }
 
   options {
@@ -26,22 +21,35 @@ pipeline {
     stage('Init Environment') {
       steps {
         script {
-          if (!env.CLOUD_PROVIDER || env.CLOUD_PROVIDER == 'undefined') {
-            error "❌ CLOUD_PROVIDER environment variable is not set."
-          }
-
-          switch (env.CLOUD_PROVIDER) {
-            case 'oci':
-              env.OCIR_REPO = 'iad.ocir.io/idtijq8cx4jl/uat-site'
-              break
-            case 'aws':
-              env.OCIR_REPO = 'aws_account_id.dkr.ecr.region.amazonaws.com/uat-site' // Replace with real ECR
-              break
-            default:
-              error "❌ Unknown CLOUD_PROVIDER: ${env.CLOUD_PROVIDER}"
-          }
-
           echo "🧭 Using CLOUD_PROVIDER=${env.CLOUD_PROVIDER}"
+
+          // Define cloud-specific values
+          def cloudVars = [
+            oci: [
+              ANSIBLE_INVENTORY: 'ansible/inventory/oci.ini',
+              OCIR_REPO:         'iad.ocir.io/idtijq8cx4jl/uat-site',
+              ANSIBLE_TARGET_HOST: 'oci.uat.pauloazedo.dev',
+              UAT_APP_URL:         'https://oci.uat.pauloazedo.dev'
+            ],
+            aws: [
+              ANSIBLE_INVENTORY: 'ansible/inventory/aws.ini',
+              OCIR_REPO:         'aws_account_id.dkr.ecr.region.amazonaws.com/uat-site', // Replace when ready
+              ANSIBLE_TARGET_HOST: 'aws.uat.pauloazedo.dev',
+              UAT_APP_URL:         'https://aws.uat.pauloazedo.dev'
+            ]
+          ]
+
+          def selected = cloudVars[env.CLOUD_PROVIDER]
+          if (!selected) {
+            error "Unknown CLOUD_PROVIDER: '${env.CLOUD_PROVIDER}'"
+          }
+
+          // Inject into environment
+          env.ANSIBLE_INVENTORY   = selected.ANSIBLE_INVENTORY
+          env.OCIR_REPO           = selected.OCIR_REPO
+          env.ANSIBLE_TARGET_HOST = selected.ANSIBLE_TARGET_HOST
+          env.UAT_APP_URL         = selected.UAT_APP_URL
+
           echo "📦 Using container repo: ${env.OCIR_REPO}"
         }
       }
@@ -120,22 +128,24 @@ pipeline {
 
   post {
     success {
-      echo "✅ UAT deployment completed: ${OCIR_REPO}:${env.IMAGE_TAG}"
-      slackSend (
-        channel: '#jenkins_notifications',
-        color: 'good',
-        message: """🚀 Version `${env.IMAGE_TAG}` was published to *UAT (${env.CLOUD_PROVIDER.toUpperCase()})* and is ready for user acceptance testing.
+      script {
+        def repo = env.OCIR_REPO ?: 'unknown'
+        echo "✅ UAT deployment completed: ${repo}:${env.IMAGE_TAG}"
+        slackSend (
+          channel: '#jenkins_notifications',
+          color: 'good',
+          message: """🚀 Version `${env.IMAGE_TAG}` was published to *UAT (${env.CLOUD_PROVIDER.toUpperCase()})* and is ready for user acceptance testing.
 🔗 <${env.BUILD_URL}|View Jenkins Build>
 🌐 <${env.UAT_APP_URL}|Open UAT Application>"""
-      )
+        )
+      }
     }
 
     failure {
-      echo "❌ Pipeline failed. Check the logs for troubleshooting."
       slackSend (
         channel: '#jenkins_notifications',
         color: 'danger',
-        message: "❌ *UAT Pipeline FAILED* for `${env.JOB_NAME}`.\n🔗 <${env.BUILD_URL}|View Jenkins Build>"
+        message: "❌ *UAT Pipeline FAILED* for `${env.JOB_NAME}` on ${env.CLOUD_PROVIDER.toUpperCase()}.\n🔗 <${env.BUILD_URL}|View Jenkins Build>"
       )
     }
   }
