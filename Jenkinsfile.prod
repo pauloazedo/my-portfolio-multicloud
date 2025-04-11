@@ -26,16 +26,16 @@ pipeline {
 
           def cloudVars = [
             oci: [
-              ANSIBLE_INVENTORY: 'ansible/inventory/oci.ini',
-              OCIR_REPO:         'iad.ocir.io/idtijq8cx4jl/prod-site',
+              ANSIBLE_INVENTORY:   'ansible/inventory/oci.ini',
+              OCIR_REPO:           'iad.ocir.io/idtijq8cx4jl/prod-site',
               ANSIBLE_TARGET_HOST: 'oci.prod.pauloazedo.dev',
-              PROD_APP_URL:         'https://oci.prod.pauloazedo.dev'
+              PROD_APP_URL:        'https://oci.prod.pauloazedo.dev'
             ],
             aws: [
-              ANSIBLE_INVENTORY: 'ansible/inventory/aws.ini',
-              OCIR_REPO:         'aws_account_id.dkr.ecr.region.amazonaws.com/prod-site', // Replace as needed
+              ANSIBLE_INVENTORY:   'ansible/inventory/aws.ini',
+              OCIR_REPO:           'aws_account_id.dkr.ecr.region.amazonaws.com/prod-site',
               ANSIBLE_TARGET_HOST: 'aws.prod.pauloazedo.dev',
-              PROD_APP_URL:         'https://aws.prod.pauloazedo.dev'
+              PROD_APP_URL:        'https://aws.prod.pauloazedo.dev'
             ]
           ]
 
@@ -49,9 +49,9 @@ pipeline {
           env.ANSIBLE_TARGET_HOST = selected.ANSIBLE_TARGET_HOST
           env.PROD_APP_URL        = selected.PROD_APP_URL
 
-          // Use tag if present, else fallback to short commit SHA
+          // Set image tag: Prefer latest tag, fallback to short SHA
           env.IMAGE_TAG = sh(
-            script: "git describe --tags --exact-match 2>/dev/null || git rev-parse --short HEAD",
+            script: "git describe --tags --abbrev=0 2>/dev/null || git rev-parse --short HEAD",
             returnStdout: true
           ).trim()
 
