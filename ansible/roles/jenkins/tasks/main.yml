@@ -1,0 +1,71 @@
+---
+# ansible/roles/jenkins/tasks/main.yml
+# Main Jenkins role task entrypoint
+
+#####################################################################
+# Step 0: Ensure cloud provider is set
+#####################################################################
+- name: Fail if cloud_provider is not defined
+  ansible.builtin.fail:
+    msg: "'cloud_provider' must be set before including this role"
+  when: cloud_provider is not defined
+  tags: always
+
+#####################################################################
+# Step 1: Ensure Jenkins data directory exists with correct ownership
+#####################################################################
+- name: Ensure Jenkins data directory exists
+  ansible.builtin.file:
+    path: "{{ jenkins_data_dir }}"
+    state: directory
+    mode: '0700'
+  tags:
+    - jenkins
+    - jenkins_storage
+
+- name: Set ownership of Jenkins data directory to UID 1000
+  ansible.builtin.file:
+    path: "{{ jenkins_data_dir }}"
+    state: directory
+    owner: "1000"
+    group: "1000"
+    recurse: true
+  tags:
+    - jenkins
+    - jenkins_storage
+
+#####################################################################
+# Step 2: Include Jenkins container setup (create if missing/broken)
+#####################################################################
+- name: Include Jenkins container setup
+  ansible.builtin.include_tasks: container.yml
+  tags:
+    - jenkins
+    - jenkins_container
+
+#####################################################################
+# Step 3: Include Jenkins tool install logic
+#####################################################################
+- name: Include Jenkins tool installation logic
+  ansible.builtin.include_tasks: tools.yml
+  tags:
+    - jenkins
+    - jenkins_tools
+
+#####################################################################
+# Step 4: Include Jenkins workspace cleanup logic
+#####################################################################
+- name: Include Jenkins workspace cleanup logic
+  ansible.builtin.include_tasks: cleanup-workspace.yml
+  tags:
+    - jenkins
+    - jenkins_cleanup
+
+#####################################################################
+# Step 5: Create ssh keys and add fingerprints
+#####################################################################
+- name: Create SSH Keys and add fingerprints
+  ansible.builtin.include_tasks: ssh-access.yml
+  tags:
+    - jenkins
+    - jenkins_cleanup

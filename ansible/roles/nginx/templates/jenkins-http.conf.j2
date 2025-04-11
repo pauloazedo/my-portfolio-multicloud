@@ -1,0 +1,16 @@
+# ansible/roles/nginx/templates/jenkins-http.conf.j2
+# HTTP config for Jenkins (used temporarily before TLS cert issuance)
+
+server {
+    listen 80;
+    server_name {{ jenkins_domain }};
+
+    location /.well-known/acme-challenge/ {
+        root /var/www/html;
+    }
+
+    location / {
+        return 200 'Jenkins is warming up...';
+        add_header Content-Type text/plain;
+    }
+}

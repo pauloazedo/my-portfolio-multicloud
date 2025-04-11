@@ -1,0 +1,31 @@
+server {
+    listen 443 ssl;
+    server_name {{ prod_domain }} {{ www_domain }};
+
+    ssl_certificate     /etc/letsencrypt/live/{{ prod_domain }}/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/{{ prod_domain }}/privkey.pem;
+    include             /etc/letsencrypt/options-ssl-nginx.conf;
+    ssl_dhparam         /etc/letsencrypt/ssl-dhparams.pem;
+
+    # Serve green container at root
+    location / {
+        proxy_pass http://localhost:{{ prod_site_green_port }}/;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    }
+
+    location /green/ {
+        proxy_pass http://localhost:{{ prod_site_green_port }}/;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    }
+
+    location /blue/ {
+        proxy_pass http://localhost:{{ prod_site_blue_port }}/;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    }
+}

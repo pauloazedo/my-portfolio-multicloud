@@ -1,0 +1,6 @@
+# ansible/group_vars/all.yml
+# Global non-sensitive variables for all hosts
+
+# This provider is responsible for the shared domain www.pauloazedo.dev
+default_provider: "oci"
+target_env: ""

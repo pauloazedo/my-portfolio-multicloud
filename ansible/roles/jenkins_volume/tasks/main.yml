@@ -1,0 +1,10 @@
+---
+# Entry point for Jenkins volume mount logic
+
+- name: Fail if cloud_provider is not defined
+  ansible.builtin.fail:
+    msg: "Variable 'cloud_provider' must be defined before including jenkins_volume role"
+  when: cloud_provider is not defined
+
+- name: Include cloud-specific volume logic
+  ansible.builtin.include_tasks: "{{ cloud_provider }}.yml"

@@ -1,0 +1,89 @@
+# -----------------------
+# General Dependencies
+# -----------------------
+**/node_modules/
+**/.pnp
+.pnp.*
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/versions
+
+# -----------------------
+# Build Outputs
+# -----------------------
+**/.next/
+**/out/
+**/build/
+**/coverage/
+*.tsbuildinfo
+next-env.d.ts
+
+# -----------------------
+# Logs and Debug Files
+# -----------------------
+*.log
+*.log.*
+*.retry
+*.vault
+.pnpm-debug.log*
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# -----------------------
+# Secrets and Sensitive Files
+# -----------------------
+*.pem
+.env*
+#*.secrets.yml
+#*.secrets.yml.*
+ansible-vault.pass
+ansible/.vault_pass
+
+# Ignore all provider-specific secrets
+#ansible/group_vars/*/*.secrets.yml
+#ansible/group_vars/*/*.secrets.yml.*
+
+# Ignore legacy global secrets
+#ansible/group_vars/all.secrets.yml
+#ansible/group_vars/all.secrets.yml.*
+
+# -----------------------
+# Terraform
+# -----------------------
+*.tfstate
+*.tfstate.backup
+*.tfvars
+.terraform/
+terraform/registry.terraform.io/
+
+# -----------------------
+# Ansible Inventory
+# -----------------------
+ansible/inventory/*
+!ansible/inventory/README.md
+!ansible/inventory/*.ini
+
+# -----------------------
+# Optional: Role Output Caches
+# -----------------------
+roles/*/
+!roles/**/tasks/
+!roles/**/defaults/
+!roles/**/handlers/
+!roles/**/meta/
+!roles/**/templates/
+!roles/**/files/
+!roles/**/vars/
+
+# -----------------------
+# Misc
+# -----------------------
+.vercel/
+.DS_Store
+
+# SSH keys (local/dev only)
+.vscode/ansible/files/id_rsa_jenkins
+ansible/files/id_rsa_jenkins

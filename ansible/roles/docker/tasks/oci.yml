@@ -1,0 +1,57 @@
+---
+# Install and configure Docker on Oracle Linux 9 ARM
+
+# Step 1: Install required packages
+- name: Install Docker prerequisites
+  ansible.builtin.package:
+    name:
+      - yum-utils
+      - device-mapper-persistent-data
+      - lvm2
+    state: present
+
+# Step 2: Add Docker CE repository
+- name: Add Docker CE YUM repository
+  ansible.builtin.yum_repository:
+    name: docker-ce-stable
+    description: Docker CE Stable - $basearch
+    baseurl: https://download.docker.com/linux/centos/9/aarch64/stable
+    gpgcheck: true
+    gpgkey: https://download.docker.com/linux/centos/gpg
+    enabled: true
+
+# Step 3: Install Docker CE, CLI, and containerd
+- name: Install Docker CE, CLI and containerd
+  ansible.builtin.package:
+    name:
+      - docker-ce
+      - docker-ce-cli
+      - containerd.io
+    state: present
+
+# Step 4: Load iptables NAT modules (for networking)
+- name: Load ip_tables
+  ansible.builtin.command: modprobe ip_tables
+  changed_when: false
+
+- name: Load iptable_nat
+  ansible.builtin.command: modprobe iptable_nat
+  changed_when: false
+
+- name: Load ip_conntrack
+  ansible.builtin.command: modprobe ip_conntrack
+  changed_when: false
+
+# Step 5: Enable and start Docker
+- name: Enable and start Docker service (with restart)
+  ansible.builtin.service:
+    name: docker
+    enabled: true
+    state: restarted
+
+# Step 6: Add current user to docker group (Ansible remote user)
+- name: Add user to docker group
+  ansible.builtin.user:
+    name: "{{ ansible_user }}"
+    groups: docker
+    append: true

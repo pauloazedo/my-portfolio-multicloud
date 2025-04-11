@@ -1,0 +1,9 @@
+# ansible/roles/nginx/templates/prod-http.conf.j2
+
+server {
+    listen 80;
+    server_name {{ prod_domain }}{% if cloud_provider == default_provider %} {{ www_domain }}{% endif %};
+
+    # Redirect all HTTP requests to HTTPS
+    return 301 https://$host$request_uri;
+}

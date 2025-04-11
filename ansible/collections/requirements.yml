@@ -1,0 +1,5 @@
+# ansible/collections/requirements.yml
+collections:
+  - name: community.docker
+  - name: community.docker
+  - name: ansible.posix

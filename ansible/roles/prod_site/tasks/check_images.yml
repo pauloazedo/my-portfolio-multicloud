@@ -1,0 +1,35 @@
+---
+# Step 3: Pull green/blue images
+- name: Try to pull green image
+  community.docker.docker_image:
+    name: "{{ prod_site_green_image }}"
+    source: pull
+  register: green_image_check
+  failed_when: false
+  ignore_errors: true
+  tags: fallback
+
+- name: Try to pull blue image
+  community.docker.docker_image:
+    name: "{{ prod_site_blue_image }}"
+    source: pull
+  register: blue_image_check
+  failed_when: false
+  ignore_errors: true
+  tags: fallback
+
+# Step 4: Set image flags
+- name: Set image availability flags
+  ansible.builtin.set_fact:
+    green_image_available: >-
+      {{ ('Image is up to date' in green_image_check.msg)
+         or ('Downloaded newer image' in green_image_check.msg) }}
+    blue_image_available: >-
+      {{ ('Image is up to date' in blue_image_check.msg)
+         or ('Downloaded newer image' in blue_image_check.msg) }}
+  tags: fallback
+
+- name: Show image availability
+  ansible.builtin.debug:
+    msg: "Green: {{ green_image_available | default(false) }}, Blue: {{ blue_image_available | default(false) }}"
+  tags: fallback

@@ -1,0 +1,76 @@
+---
+# ansible/roles/prod_site/tasks/main.yml
+# PROD Site Blue/Green Deployment Logic with Fallback
+
+#####################################################################
+# Step 1: Ensure Docker is installed on the PROD host
+#####################################################################
+- name: Ensure Docker is installed
+  ansible.builtin.include_role:
+    name: docker
+  tags: always
+
+#####################################################################
+# Step 2: Authenticate with OCIR (Oracle Container Registry)
+#####################################################################
+- name: Check if already logged into OCIR
+  ansible.builtin.command: docker info
+  register: docker_info_check
+  failed_when: false
+  changed_when: false
+
+- name: Login to OCIR (if not already logged in)
+  ansible.builtin.command:
+    cmd: >
+      docker login iad.ocir.io
+      -u {{ ocir_user }}
+      -p {{ ocir_token }}
+  when: docker_info_check.stdout is not search('iad.ocir.io')
+  no_log: true
+  changed_when: false
+
+#####################################################################
+# Step 3: Check if blue/green images exist or fallback is needed
+#####################################################################
+- name: Check availability of green/blue images
+  ansible.builtin.include_tasks: check_images.yml
+  tags: fallback
+
+#####################################################################
+# Step 4: Build and push fallback image if both images are missing
+#####################################################################
+- name: Build and push fallback image
+  ansible.builtin.include_tasks: run-fallback.yml
+  when:
+    - force_fallback | default(false) or (not green_image_available and not blue_image_available)
+  tags:
+    - fallback
+    - force-fallback
+
+#####################################################################
+# Step 5: Deploy environments
+#####################################################################
+- name: Deploy to blue environment
+  ansible.builtin.include_tasks: run-blue.yml
+  when: prod_site_target in ["both", "blue"]
+
+- name: Deploy to green environment
+  ansible.builtin.include_tasks: run-green.yml
+  when: prod_site_target in ["both", "green"]
+
+#####################################################################
+# Step 6: Cleanup fallback containers (blue/green)
+#####################################################################
+- name: Cleanup fallback resources for blue
+  ansible.builtin.include_tasks: cleanup-blue.yml
+  when:
+    - prod_site_target in ["both", "blue"]
+    - not green_image_available and not blue_image_available
+  tags: fallback
+
+- name: Cleanup fallback resources for green
+  ansible.builtin.include_tasks: cleanup-green.yml
+  when:
+    - prod_site_target in ["both", "green"]
+    - not green_image_available and not blue_image_available
+  tags: fallback

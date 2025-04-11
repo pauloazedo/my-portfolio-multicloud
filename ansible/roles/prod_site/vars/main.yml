@@ -1,0 +1,16 @@
+# These must match the proxy_pass ports in prod-https.conf.j2
+prod_site_green_port: 3100
+prod_site_blue_port: 3200
+
+prod_site_green_container: "prod_site_green"
+prod_site_blue_container: "prod_site_blue"
+
+prod_site_blue_env:
+  FALLBACK_COLOR: blue
+  FALLBACK_LABEL: Blue
+  JENKINS_DOMAIN: "{{ jenkins_fqdn }}"
+
+prod_site_green_env:
+  FALLBACK_COLOR: green
+  FALLBACK_LABEL: Green
+  JENKINS_DOMAIN: "{{ jenkins_fqdn }}"

@@ -1,0 +1,18 @@
+# ansible/roles/jenkins/tasks/cleanup-workspace.yml
+
+- name: Clean Jenkins workspace directory as root
+  community.docker.docker_container_exec:
+    container: "{{ jenkins_container_name }}"
+    user: "root"  # previously "1000"
+    command: >
+      bash -c "rm -rf /var/jenkins_home/workspace/*"
+  register: jenkins_workspace_cleanup
+  changed_when: true
+  tags:
+    - jenkins
+    - jenkins_cleanup
+
+- name: Show cleanup output
+  ansible.builtin.debug:
+    var: jenkins_workspace_cleanup.stdout_lines
+  when: jenkins_workspace_cleanup.stdout is defined

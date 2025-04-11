@@ -1,0 +1,38 @@
+# ansible/roles/prod_site/tasks/cleanup-green.yml
+
+- name: Remove fallback HTML page for green
+  ansible.builtin.file:
+    path: "/home/devops/prod-fallback-green.html"
+    state: absent
+
+- name: Remove copied fallback index.html
+  ansible.builtin.file:
+    path: /home/devops/index.html
+    state: absent
+
+- name: Remove prod-waiting.Dockerfile
+  ansible.builtin.file:
+    path: /home/devops/prod-waiting.Dockerfile
+    state: absent
+
+- name: Remove default-waiting.conf
+  ansible.builtin.file:
+    path: /home/devops/default-waiting.conf
+    state: absent
+
+- name: Remove untagged fallback Docker images (green)
+  ansible.builtin.shell: |
+    set -o pipefail
+    docker images --filter=reference='prod-waiting' \
+      --format '{{ '{{' }}.Repository{{ '}}' }}:{{ '{{' }}.Tag{{ '}}' }} {{ '{{' }}.ID{{ '}}' }}' |
+    grep -v 'prod-waiting:latest' | awk '{print $2}' | xargs -r docker rmi
+  args:
+    executable: /bin/bash
+  register: green_cleanup_result
+  changed_when: green_cleanup_result.stdout != ""
+  failed_when: false
+
+- name: Show fallback cleanup result (green)
+  ansible.builtin.debug:
+    msg: "{{ green_cleanup_result.stdout_lines | default([]) }}"
+  when: green_cleanup_result.stdout_lines is defined

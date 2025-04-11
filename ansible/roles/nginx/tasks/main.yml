@@ -1,0 +1,91 @@
+---
+# NGINX role main task list
+
+############################################################
+# Step 1: Install and start NGINX
+############################################################
+
+- name: Ensure NGINX is installed
+  ansible.builtin.package:
+    name: nginx
+    state: present
+
+- name: Enable and start NGINX service
+  ansible.builtin.service:
+    name: nginx
+    state: started
+    enabled: true
+
+############################################################
+# Step 2: Configure SELinux for NGINX Docker proxying
+############################################################
+
+- name: Allow NGINX to connect to the network (SELinux)
+  ansible.posix.seboolean:
+    name: httpd_can_network_connect
+    state: true
+    persistent: true
+
+############################################################
+# Step 3: Deploy HTTP-only configs before TLS provisioning
+############################################################
+
+- name: Deploy Jenkins HTTP config (UAT only)
+  ansible.builtin.template:
+    src: jenkins-http.conf.j2
+    dest: /etc/nginx/conf.d/jenkins.conf
+    mode: '0644'
+  when: inventory_hostname in groups['uat']
+
+- name: Deploy UAT HTTP config
+  ansible.builtin.template:
+    src: uat-http.conf.j2
+    dest: /etc/nginx/conf.d/uat.conf
+    mode: '0644'
+  when: inventory_hostname in groups['uat']
+
+- name: Deploy PROD HTTP config
+  ansible.builtin.template:
+    src: prod-http.conf.j2
+    dest: /etc/nginx/conf.d/prod.conf
+    mode: '0644'
+  when: inventory_hostname in groups['prod']
+
+############################################################
+# Step 4: Install Certbot and its NGINX plugin
+############################################################
+
+- name: Install certbot and certbot-nginx plugin
+  ansible.builtin.package:
+    name:
+      - certbot
+      - python3-certbot-nginx
+    state: present
+
+############################################################
+# Step 5: Upload Slack notification script for cert alerts
+############################################################
+
+- name: Upload Slack certbot alert script to remote host
+  ansible.builtin.copy:
+    src: files/slack-certbot-alert.sh
+    dest: /home/devops/slack-certbot-alert.sh
+    mode: '0755'
+    owner: devops
+    group: devops
+
+############################################################
+# Step 6: Generate and configure HTTPS certificates
+############################################################
+
+- name: Include Certbot tasks
+  ansible.builtin.include_tasks: certbot.yml
+  tags: certbot
+
+############################################################
+# Step 7: Setup automated renewal with Slack alert
+############################################################
+
+- name: Include Certbot renewal automation
+  ansible.builtin.include_tasks: renew.yml
+  tags: certbot

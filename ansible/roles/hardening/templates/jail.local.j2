@@ -1,0 +1,24 @@
+[DEFAULT]
+bantime = {{ hardening_fail2ban_merged_settings.bantime }}
+findtime = {{ hardening_fail2ban_merged_settings.findtime }}
+maxretry = {{ hardening_fail2ban_merged_settings.maxretry }}
+ignoreip = {{ hardening_fail2ban_merged_settings.ignoreip }}
+
+[sshd]
+enabled = true
+port = ssh
+logpath = /var/log/secure
+
+[nginx-http-auth]
+enabled = true
+filter = nginx-http-auth
+logpath = /var/log/nginx/error.log
+maxretry = 3
+
+[nginx-botsearch]
+enabled  = true
+filter   = nginx-botsearch
+logpath  = /var/log/nginx/access.log
+maxretry = 2
+findtime = 600
+bantime  = 86400

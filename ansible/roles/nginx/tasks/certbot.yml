@@ -1,0 +1,105 @@
+---
+# Generate Let's Encrypt certs and update NGINX configs per environment
+
+# Step 1: Define domains and templates per environment
+- name: Define Certbot domain sets per environment
+  ansible.builtin.set_fact:
+    nginx_certbot_domains:
+      - domains: ["{{ jenkins_fqdn }}"]
+        template: "jenkins-https.conf.j2"
+        filename: "jenkins.conf"
+        group: "uat"
+      - domains: ["{{ uat_fqdn }}"]
+        template: "uat-https.conf.j2"
+        filename: "uat.conf"
+        group: "uat"
+      - domains: >-
+          {{
+            ([prod_fqdn] + [www_domain])
+            if cloud_provider == default_provider else [prod_fqdn]
+          }}
+        template: "prod-https-bluegreen.conf.j2"
+        filename: "prod.conf"
+        group: "prod"
+  tags: certbot
+
+# Step 2: Filter domains that match the current host group
+- name: Filter domains for this host
+  ansible.builtin.set_fact:
+    certbot_domains_for_host: >-
+      {{ nginx_certbot_domains | selectattr('group', 'in', group_names) | list }}
+  tags: certbot
+
+# Step 3: Check current SANs from existing certs (if they exist)
+- name: Gather SAN info from current certs
+  ansible.builtin.shell: |
+    openssl x509 -in /etc/letsencrypt/live/{{ item.domains[0] }}/cert.pem -noout -text | grep -A1 "Subject Alternative Name"
+  register: certbot_san_check
+  changed_when: false
+  failed_when: false
+  loop: "{{ certbot_domains_for_host }}"
+  loop_control:
+    label: "{{ item.domains[0] }}"
+  tags: certbot
+
+# Step 4: Decide which certs need renewal or initial issuance
+- name: Init certbot_final_domains
+  ansible.builtin.set_fact:
+    certbot_final_domains: []
+  tags: certbot
+
+- name: Append certs to renew list if missing or SANs incomplete
+  ansible.builtin.set_fact:
+    certbot_final_domains: "{{ certbot_final_domains + [item.0] }}"
+  when: >
+    item.1.rc != 0 or
+    (
+      item.0.domains | reject('in', item.1.stdout | default('')) | list | length > 0
+    )
+  loop: "{{ certbot_domains_for_host | zip(certbot_san_check.results) | list }}"
+  loop_control:
+    label: "{{ item.0.domains[0] }}"
+  tags: certbot
+
+# Step 5: Generate HTTPS certificates with Certbot (only if needed)
+- name: Generate or renew certificates via Certbot
+  ansible.builtin.command:
+    cmd: >
+      certbot certonly --nginx
+      {% for d in item.domains %}-d {{ d }} {% endfor %}
+      --non-interactive --agree-tos
+      -m paulo@pauloazedo.dev --redirect --expand
+  register: certbot_result
+  changed_when: certbot_result.rc == 0
+  failed_when: certbot_result.rc != 0
+  loop: "{{ certbot_final_domains }}"
+  loop_control:
+    label: "{{ item.domains[0] }}"
+  tags: certbot
+
+# Step 6: Render updated HTTPS-enabled NGINX config (always)
+- name: Deploy HTTPS NGINX config
+  ansible.builtin.template:
+    src: "{{ item.template }}"
+    dest: "/etc/nginx/conf.d/{{ item.filename }}"
+    mode: '0644'
+  loop: "{{ certbot_domains_for_host }}"
+  tags: [certbot, nginx_reload_only]
+
+# Step 7: Reload NGINX to apply changes
+- name: Reload NGINX service
+  ansible.builtin.service:
+    name: nginx
+    state: reloaded
+  tags: [certbot, nginx_reload_only]
+
+# Step 8: Send Slack alert on successful certificate issuance
+- name: Notify Slack on certificate generation
+  ansible.builtin.shell: >
+    bash /home/devops/slack-certbot-alert.sh {{ slack_cert_renewal_webhook }} {{ item.item.domains[0] }}
+  args:
+    executable: /bin/bash
+  when: item.rc == 0
+  changed_when: false
+  loop: "{{ certbot_result.results | default([]) }}"
+  tags: certbot

@@ -1,0 +1,162 @@
+---
+# ansible/roles/uat_site/tasks/main.yml
+# UAT Site Deployment Entry Point
+
+############################################################
+# Step 1: Ensure Docker is installed
+############################################################
+- name: Ensure Docker is installed on UAT
+  ansible.builtin.include_role:
+    name: "{{ docker_role | default('docker') }}"
+  tags: uat_site
+
+############################################################
+# Step 2: Authenticate with OCIR (only if needed)
+############################################################
+- name: Check if already logged into OCIR
+  ansible.builtin.command: docker info
+  register: docker_info_check
+  changed_when: false
+  failed_when: false
+  tags: uat_site
+
+- name: Authenticate with OCIR (if not already logged in)
+  ansible.builtin.command:
+    cmd: >
+      docker login iad.ocir.io
+      -u {{ ocir_user }}
+      -p {{ ocir_token }}
+  when: docker_info_check.stdout is not search('iad.ocir.io')
+  no_log: true
+  changed_when: false
+  tags: uat_site
+
+############################################################
+# Step 2.5: Build and push main image (only if tag is defined)
+############################################################
+- name: Build and push UAT site Docker image
+  ansible.builtin.import_tasks: image.yml
+  when: uat_site_image_tag is defined
+  tags: uat_site
+
+############################################################
+# Step 3: Remove existing container
+############################################################
+- name: Stop and remove existing UAT site container
+  community.docker.docker_container:
+    name: "{{ uat_site_container }}"
+    state: absent
+    force_kill: true
+  tags: uat_site
+
+############################################################
+# Step 4: Try pulling image from OCIR
+############################################################
+- name: Pull UAT site image from OCIR
+  community.docker.docker_image:
+    name: "{{ uat_site_image }}"
+    source: pull
+  register: uat_image_pull
+  ignore_errors: true
+  failed_when: false
+  tags: uat_site
+
+############################################################
+# Step 5: Check if image is present locally
+############################################################
+- name: Check if image exists locally
+  community.docker.docker_image_info:
+    name: "{{ uat_site_image }}"
+  register: uat_local_image_info
+  failed_when: false
+  changed_when: false
+  tags: uat_site
+
+- name: Set image availability flag
+  ansible.builtin.set_fact:
+    uat_image_available: "{{ uat_local_image_info.images | length > 0 }}"
+  tags: uat_site
+
+- name: Show image availability
+  ansible.builtin.debug:
+    msg: "Image pulled: {{ uat_image_pull.changed }}, Local image found: {{ uat_image_available }}"
+  tags: uat_site
+
+############################################################
+# Step 6: Prepare fallback (only if no image)
+############################################################
+- name: Set fallback variables
+  ansible.builtin.set_fact:
+    fallback_color: blue
+    fallback_jenkins_domain: "{{ jenkins_domain }}"
+  when: not (uat_image_available | default(false))
+  tags: [uat_site, fallback]
+
+- name: Render fallback HTML as index.template.html
+  ansible.builtin.template:
+    src: uat-fallback-index.html.j2
+    dest: /home/devops/index.template.html
+    owner: devops
+    group: devops
+    mode: '0644'
+  when: not (uat_image_available | default(false))
+  tags: [uat_site, fallback]
+
+- name: Ensure fallback build directory exists
+  ansible.builtin.file:
+    path: "{{ uat_site_fallback_build_dir }}"
+    state: directory
+    owner: devops
+    group: devops
+    mode: '0755'
+  when: not (uat_image_available | default(false))
+  tags: [uat_site, fallback]
+
+- name: Copy fallback Dockerfile
+  ansible.builtin.copy:
+    src: uat-fallback.Dockerfile
+    dest: "{{ uat_site_fallback_build_dir }}/Dockerfile"
+    owner: devops
+    group: devops
+    mode: '0644'
+  when: not (uat_image_available | default(false))
+  tags: [uat_site, fallback]
+
+- name: Copy shared fallback NGINX config
+  ansible.builtin.copy:
+    src: default-waiting.conf
+    dest: "{{ uat_site_fallback_build_dir }}/default-waiting.conf"
+    owner: devops
+    group: devops
+    mode: '0644'
+  when: not (uat_image_available | default(false))
+  tags: [uat_site, fallback]
+
+- name: Copy rendered fallback HTML to build context as index.template.html
+  ansible.builtin.copy:
+    src: /home/devops/index.template.html
+    dest: "{{ uat_site_fallback_build_dir }}/index.template.html"
+    remote_src: true
+    owner: devops
+    group: devops
+    mode: '0644'
+  when: not (uat_image_available | default(false))
+  tags: [uat_site, fallback]
+
+############################################################
+# Step 7: Run correct container (real or fallback)
+############################################################
+- name: Deploy real UAT site container
+  ansible.builtin.import_tasks: run-site.yml
+  when: uat_image_available | default(false)
+  tags: uat_site
+
+- name: Deploy fallback UAT container
+  ansible.builtin.import_tasks: run-fallback.yml
+  when: not (uat_image_available | default(false))
+  tags: [uat_site, fallback]
+
+- name: Cleanup old fallback images
+  ansible.builtin.import_tasks: cleanup.yml
+  when: not (uat_image_available | default(false))
+  tags: [uat_site, fallback]

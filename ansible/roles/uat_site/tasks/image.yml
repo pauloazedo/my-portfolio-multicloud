@@ -1,0 +1,11 @@
+# ansible/roles/uat_site/tasks/image.yml
+---
+
+- name: Build and tag UAT Docker image (on UAT server)
+  community.docker.docker_image:
+    name: "{{ uat_site_ocir_repo }}"
+    tag: "{{ uat_site_image_tag }}"
+    build:
+      path: "/home/devops/frontend"
+    source: build
+    push: true

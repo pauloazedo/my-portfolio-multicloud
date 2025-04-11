@@ -1,0 +1,140 @@
+---
+# ansible/roles/prod_site/tasks/run-fallback.yml
+# Build and deploy dynamic fallback PROD image to OCIR, used by both blue and green containers.
+
+- name: Show fallback condition debug
+  ansible.builtin.debug:
+    msg: >
+      green_image_available={{ green_image_available | default('undefined') }},
+      blue_image_available={{ blue_image_available | default('undefined') }},
+      force_fallback={{ force_fallback | default(false) }}
+  tags: fallback
+
+############################################################
+# Step 1: Prepare fallback Docker build context
+############################################################
+
+- name: Copy fallback Dockerfile
+  ansible.builtin.copy:
+    src: files/prod-waiting.Dockerfile
+    dest: /home/devops/prod-waiting.Dockerfile
+    owner: devops
+    group: devops
+    mode: '0644'
+
+- name: Copy fallback NGINX config
+  ansible.builtin.copy:
+    src: files/default-waiting.conf
+    dest: /home/devops/default-waiting.conf
+    owner: devops
+    group: devops
+    mode: '0644'
+
+- name: Copy fallback HTML template with ${...} placeholders
+  ansible.builtin.copy:
+    src: templates/prod-fallback-index.template
+    dest: /home/devops/prod-fallback-index.html
+    owner: devops
+    group: devops
+    mode: '0644'
+
+############################################################
+# Step 2: Build fallback Docker image
+############################################################
+
+- name: Build fallback PROD image
+  community.docker.docker_image:
+    name: prod-waiting
+    tag: latest
+    source: build
+    force_source: true
+    build:
+      path: /home/devops
+      dockerfile: prod-waiting.Dockerfile
+      labels:
+        org.opencontainers.image.created: "{{ ansible_date_time.iso8601 }}"
+        org.opencontainers.image.description: "Dynamic fallback PROD site – waiting for Jenkins"
+        org.opencontainers.image.source: "ansible"
+  register: fallback_build_result
+
+- name: Log fallback image build result
+  ansible.builtin.debug:
+    msg: "Built fallback PROD image: {{ fallback_build_result.image }}"
+
+############################################################
+# Step 3: Tag and push fallback image to OCIR
+############################################################
+
+- name: Tag fallback image for OCIR
+  ansible.builtin.command:
+    cmd: docker tag prod-waiting:latest {{ prod_site_waiting_image }}
+  changed_when: true
+
+- name: Push fallback image to OCIR
+  ansible.builtin.command:
+    cmd: docker push {{ prod_site_waiting_image }}
+  changed_when: true
+  register: fallback_push_result
+
+- name: Log fallback image push result
+  ansible.builtin.debug:
+    msg: "Pushed fallback image to OCIR: {{ fallback_push_result.stdout_lines | default([]) }}"
+
+############################################################
+# Step 4: Stop any existing fallback containers
+############################################################
+
+- name: Stop and remove existing blue fallback container
+  community.docker.docker_container:
+    name: prod_site_blue
+    state: absent
+    force_kill: true
+
+- name: Stop and remove existing green fallback container
+  community.docker.docker_container:
+    name: prod_site_green
+    state: absent
+    force_kill: true
+
+############################################################
+# Step 5: Start new fallback containers with dynamic ENV
+############################################################
+
+- name: Run fallback blue container
+  community.docker.docker_container:
+    name: prod_site_blue
+    image: "{{ prod_site_waiting_image }}"
+    state: started
+    restart_policy: unless-stopped
+    published_ports:
+      - "3200:3000"
+    env:  # noqa var-naming
+      FALLBACK_LABEL: "bblue" # noqa var-naming
+      FALLBACK_COLOR: "blue" # noqa var-naming
+      JENKINS_DOMAIN: "{{ jenkins_fqdn }}" # noqa var-naming
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+- name: Run fallback green container
+  community.docker.docker_container:
+    name: prod_site_green
+    image: "{{ prod_site_waiting_image }}"
+    state: started
+    restart_policy: unless-stopped
+    published_ports:
+      - "3100:3000"
+    env:  # noqa var-naming
+      FALLBACK_COLOR: "greencolor" # noqa var-naming
+      FALLBACK_LABEL: "greenlabel" # noqa var-naming
+      
+      JENKINS_DOMAIN: "{{ jenkins_fqdn }}" # noqa var-naming
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
