@@ -1,32 +1,15 @@
-// Slack notification helper
-def sendSlackNotification(String message) {
-  withCredentials([string(credentialsId: 'slack-webhook-jenkins', variable: 'SLACK_WEBHOOK_URL')]) {
-    script {
-      sh """
-        curl -s -X POST -H "Content-type: application/json" \\
-          --data '{"text": "${message}"}' \\
-          "\${SLACK_WEBHOOK_URL}"
-      """
-    }
-  }
-}
-
 pipeline {
   agent any
 
   environment {
-    ANSIBLE_INVENTORY     = 'ansible/inventory/oci.ini'
-    OCIR_REPO             = 'iad.ocir.io/idtijq8cx4jl/prod-site'
+    CLOUD_PROVIDER        = "${env.CLOUD_PROVIDER ?: 'oci'}"
     SSH_KEY_PATH          = '/var/jenkins_home/.ssh/id_rsa'
     ANSIBLE_REMOTE_USER   = 'devops'
-    ANSIBLE_TARGET_HOST   = 'oci.prod.pauloazedo.dev'
     JENKINS_MARKER        = '/var/jenkins_home/.jenkins_self_deploy'
     FRONTEND_SRC_DIR      = './my-portfolio/frontend/'
     FRONTEND_DST_DIR      = '/home/devops/frontend'
-    IMAGE_TAG_FILE        = 'image_tag.txt'
+    IMAGE_TAG             = ''
     VENV_ACTIVATE         = '/home/jenkins/venv/bin/ansible-playbook'
-    PROD_BLUE_URL         = 'https://oci.prod.pauloazedo.dev/blue'
-    PROD_LIVE_URL         = 'https://www.pauloazedo.dev'
   }
 
   options {
@@ -36,32 +19,54 @@ pipeline {
 
   stages {
 
-    stage('Checkout SCM') {
+    stage('Init Environment') {
+      steps {
+        script {
+          echo "🧭 Using CLOUD_PROVIDER=${env.CLOUD_PROVIDER}"
+
+          def cloudVars = [
+            oci: [
+              ANSIBLE_INVENTORY: 'ansible/inventory/oci.ini',
+              OCIR_REPO:         'iad.ocir.io/idtijq8cx4jl/prod-site',
+              ANSIBLE_TARGET_HOST: 'oci.prod.pauloazedo.dev',
+              PROD_APP_URL:         'https://oci.prod.pauloazedo.dev'
+            ],
+            aws: [
+              ANSIBLE_INVENTORY: 'ansible/inventory/aws.ini',
+              OCIR_REPO:         'aws_account_id.dkr.ecr.region.amazonaws.com/prod-site', // Replace as needed
+              ANSIBLE_TARGET_HOST: 'aws.prod.pauloazedo.dev',
+              PROD_APP_URL:         'https://aws.prod.pauloazedo.dev'
+            ]
+          ]
+
+          def selected = cloudVars[env.CLOUD_PROVIDER]
+          if (!selected) {
+            error "❌ Unknown CLOUD_PROVIDER: '${env.CLOUD_PROVIDER}'"
+          }
+
+          env.ANSIBLE_INVENTORY   = selected.ANSIBLE_INVENTORY
+          env.OCIR_REPO           = selected.OCIR_REPO
+          env.ANSIBLE_TARGET_HOST = selected.ANSIBLE_TARGET_HOST
+          env.PROD_APP_URL        = selected.PROD_APP_URL
+
+          // Use tag if present, else fallback to short commit SHA
+          env.IMAGE_TAG = sh(
+            script: "git describe --tags --exact-match 2>/dev/null || git rev-parse --short HEAD",
+            returnStdout: true
+          ).trim()
+
+          echo "📦 Deploying image version: ${env.IMAGE_TAG}"
+        }
+      }
+    }
+
+    stage('Checkout Source') {
       steps {
         checkout scm
       }
     }
 
-    stage('Checkout main branch') {
-      steps {
-        git branch: 'main', url: 'https://github.com/pauloazedo/my-portfolio-multicloud.git'
-      }
-    }
-
-    stage('Generate Image Tag') {
-      steps {
-        script {
-          def tag = sh(script: "git describe --tags --abbrev=0 || true", returnStdout: true).trim()
-          if (!tag) {
-            tag = sh(script: "git rev-parse --short HEAD", returnStdout: true).trim()
-          }
-          env.IMAGE_TAG = tag
-          writeFile file: IMAGE_TAG_FILE, text: env.IMAGE_TAG
-        }
-      }
-    }
-
-    stage('Sync Frontend to PROD (BLUE)') {
+    stage('Sync Frontend to PROD') {
       steps {
         sh '''
           set -e
@@ -72,7 +77,7 @@ pipeline {
       }
     }
 
-    stage('Deploy BLUE Container to PROD') {
+    stage('Deploy to BLUE Container') {
       steps {
         withCredentials([file(credentialsId: 'ansible-vault-passfile', variable: 'VAULT_PASS_FILE')]) {
           sh '''
@@ -85,10 +90,9 @@ pipeline {
 
             ${VENV_ACTIVATE} -i ${ANSIBLE_INVENTORY} ansible/prod.yml \
               --limit prod \
-              --tags prod_site \
+              --tags prod_site_blue \
               --extra-vars "prod_site_custom_image=${OCIR_REPO}:${IMAGE_TAG} \
-                            prod_site_image_tag=blue \
-                            prod_site_color=blue" \
+                            prod_site_image_tag=${IMAGE_TAG}" \
               --vault-password-file "${VAULT_PASS_FILE}"
           '''
         }
@@ -98,68 +102,57 @@ pipeline {
         always {
           sh 'rm -f ${JENKINS_MARKER} || true'
         }
-        success {
-          echo "✅ BLUE deployment completed: ${OCIR_REPO}:${env.IMAGE_TAG}"
-          script {
-            sendSlackNotification("""🚀 *New version* `${env.IMAGE_TAG}` has been deployed to the *preview environment (BLUE)*.
+      }
+    }
 
-🔍 Review here: <${env.PROD_BLUE_URL}|Preview the app>
-🛠️ Jenkins build: <${env.BUILD_URL}|View build log>
-
-🧪 *To make this version live*, manual approval is required.
-👉 <${env.BUILD_URL}|Click here to approve and promote to production>""")
-          }
+    stage('Await Manual Approval to Promote GREEN') {
+      steps {
+        timeout(time: 2, unit: 'HOURS') {
+          input message: "Promote BLUE container to GREEN?", ok: "Approve"
         }
       }
     }
 
-    stage('Manual Approval: Promote BLUE to GREEN') {
-      steps {
-        input message: "Promote BLUE container to GREEN (LIVE)?"
-      }
-    }
-
-    stage('Deploy GREEN Container to PROD') {
+    stage('Promote BLUE to GREEN') {
       steps {
         withCredentials([file(credentialsId: 'ansible-vault-passfile', variable: 'VAULT_PASS_FILE')]) {
           sh '''
             set -e
-            echo '[INFO] Tagging image for GREEN deployment'
-
             export ANSIBLE_SSH_ARGS="-i ${SSH_KEY_PATH} -o StrictHostKeyChecking=accept-new"
             export ANSIBLE_REMOTE_USER=${ANSIBLE_REMOTE_USER}
 
             ${VENV_ACTIVATE} -i ${ANSIBLE_INVENTORY} ansible/prod.yml \
               --limit prod \
-              --tags prod_site \
-              --extra-vars "prod_site_custom_image=${OCIR_REPO}:${IMAGE_TAG} \
-                            prod_site_image_tag=green \
-                            prod_site_color=green" \
+              --tags prod_site_promote \
+              --extra-vars "prod_site_image_tag=${IMAGE_TAG}" \
               --vault-password-file "${VAULT_PASS_FILE}"
           '''
-        }
-      }
-
-      post {
-        success {
-          echo "✅ GREEN deployment completed: ${OCIR_REPO}:${env.IMAGE_TAG} is now live"
-          script {
-            sendSlackNotification("""✅ Version `${env.IMAGE_TAG}` is now *LIVE* in production.
-
-🌐 Visit the app: <${env.PROD_LIVE_URL}|Open www.pauloazedo.dev>
-🛠️ Jenkins build: <${env.BUILD_URL}|View build log>""")
-          }
         }
       }
     }
   }
 
   post {
-    failure {
-      echo "❌ Pipeline failed. Check the logs for troubleshooting."
+    success {
       script {
-        sendSlackNotification("❌ *PROD Pipeline FAILED* for `${env.JOB_NAME}`.\n🔗 <${env.BUILD_URL}|View Jenkins build>")
+        slackSend (
+          channel: '#jenkins_notifications',
+          color: 'good',
+          message: """🟢 *PROD Deployment Completed!*
+• Version: `${env.IMAGE_TAG}`
+• Environment: *${env.CLOUD_PROVIDER.toUpperCase()}*
+• 🔗 <${env.BUILD_URL}|View Jenkins Build>
+• 🌐 <${env.PROD_APP_URL}|Open Live App>"""
+        )
       }
+    }
+
+    failure {
+      slackSend (
+        channel: '#jenkins_notifications',
+        color: 'danger',
+        message: "❌ *PROD Pipeline FAILED* for `${env.IMAGE_TAG}`.\n🔗 <${env.BUILD_URL}|View Jenkins Build>"
+      )
     }
   }
 }
