@@ -26,16 +26,16 @@ pipeline {
 
           def cloudVars = [
             oci: [
-              ANSIBLE_INVENTORY:   'ansible/inventory/oci.ini',
-              OCIR_REPO:           'iad.ocir.io/idtijq8cx4jl/prod-site',
-              ANSIBLE_TARGET_HOST: 'oci.prod.pauloazedo.dev',
-              PROD_APP_URL:        'https://oci.prod.pauloazedo.dev'
+              ANSIBLE_INVENTORY:    'ansible/inventory/oci.ini',
+              OCIR_REPO:            'iad.ocir.io/idtijq8cx4jl/prod-site',
+              ANSIBLE_TARGET_HOST:  'oci.prod.pauloazedo.dev',
+              PROD_APP_URL:         'https://oci.prod.pauloazedo.dev'
             ],
             aws: [
-              ANSIBLE_INVENTORY:   'ansible/inventory/aws.ini',
-              OCIR_REPO:           'aws_account_id.dkr.ecr.region.amazonaws.com/prod-site',
-              ANSIBLE_TARGET_HOST: 'aws.prod.pauloazedo.dev',
-              PROD_APP_URL:        'https://aws.prod.pauloazedo.dev'
+              ANSIBLE_INVENTORY:    'ansible/inventory/aws.ini',
+              OCIR_REPO:            'aws_account_id.dkr.ecr.region.amazonaws.com/prod-site', // TODO: replace with real AWS repo
+              ANSIBLE_TARGET_HOST:  'aws.prod.pauloazedo.dev',
+              PROD_APP_URL:         'https://aws.prod.pauloazedo.dev'
             ]
           ]
 
@@ -49,9 +49,8 @@ pipeline {
           env.ANSIBLE_TARGET_HOST = selected.ANSIBLE_TARGET_HOST
           env.PROD_APP_URL        = selected.PROD_APP_URL
 
-          // Set image tag: Prefer latest tag, fallback to short SHA
           env.IMAGE_TAG = sh(
-            script: "git describe --tags --abbrev=0 2>/dev/null || git rev-parse --short HEAD",
+            script: "git describe --tags --abbrev=0",
             returnStdout: true
           ).trim()
 
