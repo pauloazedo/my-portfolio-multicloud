@@ -1,15 +1,17 @@
 // Jenkinsfile.uat
 
-// Early exit if not a Git tag
-if (!env.GIT_BRANCH?.startsWith("refs/tags/")) {
-  echo "⏭️ Skipping build: not a tag push (GIT_BRANCH=${env.GIT_BRANCH})"
+// Early exit if not a Git tag (safe + reliable check)
+def gitTag = sh(script: "git describe --tags --exact-match || true", returnStdout: true).trim()
+if (!gitTag || !gitTag.startsWith("v")) {
+  echo "⏭️ Skipping build: not a valid semantic version tag (got: '${gitTag}')"
   return
 }
+env.IMAGE_TAG = gitTag
 
 // Optional debug log
 echo "🧠 Pipeline triggered by:"
-echo "→ GIT_BRANCH = ${env.GIT_BRANCH}"
-echo "→ GIT_COMMIT  = ${env.GIT_COMMIT}"
+echo "→ IMAGE_TAG = ${env.IMAGE_TAG}"
+echo "→ GIT_COMMIT = ${env.GIT_COMMIT}"
 
 pipeline {
   agent any
@@ -37,12 +39,6 @@ pipeline {
 
     stage('Checkout Specific Tag') {
       steps {
-        script {
-          def tagName = env.GIT_BRANCH.replaceFirst(/^refs\/tags\//, '')
-          echo "📌 Tag detected: ${tagName}"
-          env.IMAGE_TAG = tagName
-        }
-
         checkout([
           $class: 'GitSCM',
           branches: [[name: "refs/tags/${env.IMAGE_TAG}"]],
