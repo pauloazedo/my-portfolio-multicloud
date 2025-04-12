@@ -49,10 +49,15 @@ pipeline {
           env.ANSIBLE_TARGET_HOST = selected.ANSIBLE_TARGET_HOST
           env.PROD_APP_URL        = selected.PROD_APP_URL
 
+          // FIX: resolve tag that points to HEAD
           env.IMAGE_TAG = sh(
-            script: "git describe --tags --abbrev=0",
+            script: "git tag --points-at HEAD | head -n1",
             returnStdout: true
           ).trim()
+
+          if (!env.IMAGE_TAG) {
+            error "❌ No tag found on HEAD. Ensure you're merging a tagged commit into main."
+          }
 
           echo "📦 Deploying image version: ${env.IMAGE_TAG}"
         }
