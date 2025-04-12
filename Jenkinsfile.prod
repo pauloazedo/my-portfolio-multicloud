@@ -33,7 +33,7 @@ pipeline {
             ],
             aws: [
               ANSIBLE_INVENTORY:    'ansible/inventory/aws.ini',
-              OCIR_REPO:            'aws_account_id.dkr.ecr.region.amazonaws.com/prod-site',
+              OCIR_REPO:            'aws_account_id.dkr.ecr.region.amazonaws.com/prod-site', // TODO
               ANSIBLE_TARGET_HOST:  'aws.prod.pauloazedo.dev',
               PROD_APP_URL:         'https://aws.prod.pauloazedo.dev'
             ]
@@ -49,11 +49,18 @@ pipeline {
           env.ANSIBLE_TARGET_HOST = selected.ANSIBLE_TARGET_HOST
           env.PROD_APP_URL        = selected.PROD_APP_URL
 
-          // This works even after merging a tag into main
+          // Explicit fetch to get tag references
+          sh 'git fetch --tags --force'
+
+          // Get tag attached to HEAD (fail if missing)
           env.IMAGE_TAG = sh(
-            script: "git describe --tags --abbrev=0",
+            script: "git tag --points-at HEAD | head -n1",
             returnStdout: true
           ).trim()
+
+          if (!env.IMAGE_TAG) {
+            error "❌ No tag found on HEAD. Ensure you're merging a tagged commit into main."
+          }
 
           echo "📦 Deploying image version: ${env.IMAGE_TAG}"
         }
