@@ -58,7 +58,7 @@ pipeline {
           def tag = sh(script: '''
             set -e
             git fetch --tags --force
-            git tag --merged HEAD --sort=-creatordate | grep '^v' | head -n1
+            git describe --tags --abbrev=0
           ''', returnStdout: true).trim()
 
           if (!tag) {
@@ -102,7 +102,6 @@ pipeline {
           '''
         }
       }
-
       post {
         always {
           sh 'rm -f ${JENKINS_MARKER} || true'
