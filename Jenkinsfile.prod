@@ -33,7 +33,7 @@ pipeline {
             ],
             aws: [
               ANSIBLE_INVENTORY:    'ansible/inventory/aws.ini',
-              OCIR_REPO:            'aws_account_id.dkr.ecr.region.amazonaws.com/prod-site', // TODO
+              OCIR_REPO:            'aws_account_id.dkr.ecr.region.amazonaws.com/prod-site',
               ANSIBLE_TARGET_HOST:  'aws.prod.pauloazedo.dev',
               PROD_APP_URL:         'https://aws.prod.pauloazedo.dev'
             ]
@@ -49,13 +49,9 @@ pipeline {
           env.ANSIBLE_TARGET_HOST = selected.ANSIBLE_TARGET_HOST
           env.PROD_APP_URL        = selected.PROD_APP_URL
 
-          // Explicitly set IMAGE_TAG
+          // Set IMAGE_TAG
           env.IMAGE_TAG = sh(
-            script: '''
-              set -e
-              git fetch --tags --force
-              git tag --merged HEAD --sort=-creatordate | grep ^v | head -n1
-            ''',
+            script: 'git fetch --tags --force && git tag --merged HEAD --sort=-creatordate | grep ^v | head -n1',
             returnStdout: true
           ).trim()
 
@@ -105,7 +101,6 @@ pipeline {
           '''
         }
       }
-
       post {
         always {
           sh 'rm -f ${JENKINS_MARKER} || true'
