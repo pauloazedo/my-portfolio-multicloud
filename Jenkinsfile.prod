@@ -33,7 +33,7 @@ pipeline {
             ],
             aws: [
               ANSIBLE_INVENTORY:    'ansible/inventory/aws.ini',
-              OCIR_REPO:            'aws_account_id.dkr.ecr.region.amazonaws.com/prod-site',
+              OCIR_REPO:            'aws_account_id.dkr.ecr.region.amazonaws.com/prod-site', // TODO
               ANSIBLE_TARGET_HOST:  'aws.prod.pauloazedo.dev',
               PROD_APP_URL:         'https://aws.prod.pauloazedo.dev'
             ]
@@ -49,20 +49,20 @@ pipeline {
           env.ANSIBLE_TARGET_HOST = selected.ANSIBLE_TARGET_HOST
           env.PROD_APP_URL        = selected.PROD_APP_URL
 
-          // Fetch and resolve the last reachable tag from main
+          // Fetch latest tags and resolve IMAGE_TAG from current HEAD
           env.IMAGE_TAG = sh(
             script: '''
               set -e
               git fetch --tags --force
-              git checkout -B main origin/main
-              git describe --tags --abbrev=0 main
+              tag=$(git tag --merged HEAD --sort=-creatordate | grep '^v' | head -n1)
+              if [ -z "$tag" ]; then
+                echo "[ERROR] No valid tag found reachable from HEAD"
+                exit 1
+              fi
+              echo "$tag"
             ''',
             returnStdout: true
           ).trim()
-
-          if (!env.IMAGE_TAG || !env.IMAGE_TAG.startsWith("v")) {
-            error "❌ No valid tag found. Ensure your release is tagged (e.g. v0.0.30) before merging to main."
-          }
 
           echo "📦 Deploying image version: ${env.IMAGE_TAG}"
         }
