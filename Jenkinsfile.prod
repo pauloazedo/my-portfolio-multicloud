@@ -49,10 +49,15 @@ pipeline {
           env.ANSIBLE_TARGET_HOST = selected.ANSIBLE_TARGET_HOST
           env.PROD_APP_URL        = selected.PROD_APP_URL
 
-          // Explicit fetch to get tag references
-          sh 'git fetch --tags --force'
+          // Ensure we're on local main with tags available
+          sh '''
+            set -e
+            git fetch --tags --force
+            git checkout main
+            git pull origin main --ff-only
+          '''
 
-          // Get latest reachable tag (safe after merge)
+          // Get the most recent tag reachable from HEAD
           env.IMAGE_TAG = sh(
             script: "git describe --tags --abbrev=0",
             returnStdout: true
