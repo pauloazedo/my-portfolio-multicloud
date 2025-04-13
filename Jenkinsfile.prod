@@ -19,6 +19,12 @@ pipeline {
 
   stages {
 
+    stage('Checkout Source') {
+      steps {
+        checkout scm
+      }
+    }
+
     stage('Init Environment') {
       steps {
         script {
@@ -62,12 +68,6 @@ pipeline {
           env.IMAGE_TAG = tag
           echo "📦 Deploying image version: ${env.IMAGE_TAG}"
         }
-      }
-    }
-
-    stage('Checkout Source') {
-      steps {
-        checkout scm
       }
     }
 
