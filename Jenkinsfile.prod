@@ -49,20 +49,19 @@ pipeline {
           env.ANSIBLE_TARGET_HOST = selected.ANSIBLE_TARGET_HOST
           env.PROD_APP_URL        = selected.PROD_APP_URL
 
-          // Fetch latest tags and resolve IMAGE_TAG from current HEAD
+          // Explicitly set IMAGE_TAG
           env.IMAGE_TAG = sh(
             script: '''
               set -e
               git fetch --tags --force
-              tag=$(git tag --merged HEAD --sort=-creatordate | grep '^v' | head -n1)
-              if [ -z "$tag" ]; then
-                echo "[ERROR] No valid tag found reachable from HEAD"
-                exit 1
-              fi
-              echo "$tag"
+              git tag --merged HEAD --sort=-creatordate | grep ^v | head -n1
             ''',
             returnStdout: true
           ).trim()
+
+          if (!env.IMAGE_TAG) {
+            error "❌ No valid tag found. Ensure your release is tagged (e.g. v0.0.30) before merging to main."
+          }
 
           echo "📦 Deploying image version: ${env.IMAGE_TAG}"
         }
