@@ -160,3 +160,7 @@
   ansible.builtin.import_tasks: cleanup.yml
   when: not (uat_image_available | default(false))
   tags: [uat_site, fallback]
+
+- name: Final Docker system cleanup to reclaim disk space
+  ansible.builtin.import_tasks: docker-prune.yml
+  tags: [uat_site, cleanup]

@@ -74,3 +74,7 @@
     - prod_site_target in ["both", "green"]
     - not green_image_available and not blue_image_available
   tags: fallback
+
+- name: Final Docker system cleanup to reclaim disk space
+  ansible.builtin.import_tasks: docker-prune.yml
+  tags: [prod_site, cleanup]
