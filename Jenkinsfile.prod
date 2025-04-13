@@ -20,45 +20,48 @@ pipeline {
   stages {
 
     stage('Init Environment') {
-      script {
-        echo "🧭 Using CLOUD_PROVIDER=${env.CLOUD_PROVIDER}"
+      steps {
+        script {
+          echo "🧭 Using CLOUD_PROVIDER=${env.CLOUD_PROVIDER}"
 
-        def cloudVars = [
-          oci: [
-            ANSIBLE_INVENTORY:    'ansible/inventory/oci.ini',
-            OCIR_REPO:            'iad.ocir.io/idtijq8cx4jl/prod-site',
-            ANSIBLE_TARGET_HOST:  'oci.prod.pauloazedo.dev',
-            PROD_APP_URL:         'https://oci.prod.pauloazedo.dev'
-          ],
-          aws: [
-            ANSIBLE_INVENTORY:    'ansible/inventory/aws.ini',
-            OCIR_REPO:            'aws_account_id.dkr.ecr.region.amazonaws.com/prod-site',
-            ANSIBLE_TARGET_HOST:  'aws.prod.pauloazedo.dev',
-            PROD_APP_URL:         'https://aws.prod.pauloazedo.dev'
+          def cloudVars = [
+            oci: [
+              ANSIBLE_INVENTORY:    'ansible/inventory/oci.ini',
+              OCIR_REPO:            'iad.ocir.io/idtijq8cx4jl/prod-site',
+              ANSIBLE_TARGET_HOST:  'oci.prod.pauloazedo.dev',
+              PROD_APP_URL:         'https://oci.prod.pauloazedo.dev'
+            ],
+            aws: [
+              ANSIBLE_INVENTORY:    'ansible/inventory/aws.ini',
+              OCIR_REPO:            'aws_account_id.dkr.ecr.region.amazonaws.com/prod-site',
+              ANSIBLE_TARGET_HOST:  'aws.prod.pauloazedo.dev',
+              PROD_APP_URL:         'https://aws.prod.pauloazedo.dev'
+            ]
           ]
-        ]
 
-        def selected = cloudVars[env.CLOUD_PROVIDER]
-        if (!selected) {
-          error "❌ Unknown CLOUD_PROVIDER: '${env.CLOUD_PROVIDER}'"
+          def selected = cloudVars[env.CLOUD_PROVIDER]
+          if (!selected) {
+            error "❌ Unknown CLOUD_PROVIDER: '${env.CLOUD_PROVIDER}'"
+          }
+
+          env.ANSIBLE_INVENTORY   = selected.ANSIBLE_INVENTORY
+          env.OCIR_REPO           = selected.OCIR_REPO
+          env.ANSIBLE_TARGET_HOST = selected.ANSIBLE_TARGET_HOST
+          env.PROD_APP_URL        = selected.PROD_APP_URL
+
+          def tag = sh(script: '''
+            set -e
+            git fetch --tags --force
+            git tag --merged HEAD --sort=-creatordate | grep '^v' | head -n1
+          ''', returnStdout: true).trim()
+
+          if (!tag) {
+            error "❌ No valid tag found. Ensure your release is tagged (e.g. v0.0.30) before merging to main."
+          }
+
+          env.IMAGE_TAG = tag
+          echo "📦 Deploying image version: ${env.IMAGE_TAG}"
         }
-
-        env.ANSIBLE_INVENTORY   = selected.ANSIBLE_INVENTORY
-        env.OCIR_REPO           = selected.OCIR_REPO
-        env.ANSIBLE_TARGET_HOST = selected.ANSIBLE_TARGET_HOST
-        env.PROD_APP_URL        = selected.PROD_APP_URL
-
-        env.IMAGE_TAG = sh(script: '''
-          set -e
-          git fetch --tags --force
-          git tag --merged HEAD --sort=-creatordate | grep '^v' | head -n1
-        ''', returnStdout: true).trim()
-
-        if (!env.IMAGE_TAG) {
-          error "❌ No valid tag found. Ensure your release is tagged (e.g. v0.0.30) before merging to main."
-        }
-
-        echo "📦 Deploying image version: ${env.IMAGE_TAG}"
       }
     }
 
