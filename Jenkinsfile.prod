@@ -33,7 +33,7 @@ pipeline {
             ],
             aws: [
               ANSIBLE_INVENTORY:    'ansible/inventory/aws.ini',
-              OCIR_REPO:            'aws_account_id.dkr.ecr.region.amazonaws.com/prod-site', // TODO
+              OCIR_REPO:            'aws_account_id.dkr.ecr.region.amazonaws.com/prod-site',
               ANSIBLE_TARGET_HOST:  'aws.prod.pauloazedo.dev',
               PROD_APP_URL:         'https://aws.prod.pauloazedo.dev'
             ]
@@ -49,13 +49,13 @@ pipeline {
           env.ANSIBLE_TARGET_HOST = selected.ANSIBLE_TARGET_HOST
           env.PROD_APP_URL        = selected.PROD_APP_URL
 
-          // Explicit tag discovery
+          // Fetch and resolve the last reachable tag from main
           env.IMAGE_TAG = sh(
             script: '''
               set -e
               git fetch --tags --force
               git checkout -B main origin/main
-              git describe --tags --exact-match 2>/dev/null || git describe --tags --abbrev=0
+              git describe --tags --abbrev=0 main
             ''',
             returnStdout: true
           ).trim()
