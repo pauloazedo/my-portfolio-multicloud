@@ -49,17 +49,14 @@ pipeline {
           env.ANSIBLE_TARGET_HOST = selected.ANSIBLE_TARGET_HOST
           env.PROD_APP_URL        = selected.PROD_APP_URL
 
-          // Ensure we're on local main with tags available
-          sh '''
-            set -e
-            git fetch --tags --force
-            git checkout main
-            git pull origin main --ff-only
-          '''
-
-          // Get the most recent tag reachable from HEAD
+          // Explicit tag discovery
           env.IMAGE_TAG = sh(
-            script: "git describe --tags --abbrev=0",
+            script: '''
+              set -e
+              git fetch --tags --force
+              git checkout -B main origin/main
+              git describe --tags --exact-match 2>/dev/null || git describe --tags --abbrev=0
+            ''',
             returnStdout: true
           ).trim()
 
