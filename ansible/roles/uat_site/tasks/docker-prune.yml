@@ -1,0 +1,18 @@
+# ansible/roles/uat_site/tasks/docker-prune.yml
+---
+# Prune all unused Docker data except running containers
+
+- name: Prune unused Docker images and build cache
+  ansible.builtin.shell: docker system prune -af --volumes
+  args:
+    executable: /bin/bash
+  register: docker_prune_output
+  changed_when: docker_prune_output.stdout != ""
+  failed_when: false
+  tags: [uat_site, cleanup]
+
+- name: Show Docker prune result
+  ansible.builtin.debug:
+    msg: "{{ docker_prune_output.stdout_lines | default([]) }}"
+  when: docker_prune_output.stdout_lines is defined
+  tags: [uat_site, cleanup]

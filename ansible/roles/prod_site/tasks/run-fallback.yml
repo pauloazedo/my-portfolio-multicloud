@@ -129,8 +129,7 @@
       - "3100:3000"
     env:  # noqa var-naming
       FALLBACK_COLOR: "greencolor" # noqa var-naming
-      FALLBACK_LABEL: "greenlabel" # noqa var-naming
-      
+      FALLBACK_LABEL: "greenlabel" # noqa var-naming 
       JENKINS_DOMAIN: "{{ jenkins_fqdn }}" # noqa var-naming
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3000/"]
