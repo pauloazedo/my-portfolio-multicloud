@@ -52,14 +52,14 @@ pipeline {
           // Explicit fetch to get tag references
           sh 'git fetch --tags --force'
 
-          // Get tag attached to HEAD (fail if missing)
+          // Get latest reachable tag (safe after merge)
           env.IMAGE_TAG = sh(
-            script: "git tag --points-at HEAD | head -n1",
+            script: "git describe --tags --abbrev=0",
             returnStdout: true
           ).trim()
 
-          if (!env.IMAGE_TAG) {
-            error "❌ No tag found on HEAD. Ensure you're merging a tagged commit into main."
+          if (!env.IMAGE_TAG || !env.IMAGE_TAG.startsWith("v")) {
+            error "❌ No valid tag found. Ensure your release is tagged (e.g. v0.0.30) before merging to main."
           }
 
           echo "📦 Deploying image version: ${env.IMAGE_TAG}"
