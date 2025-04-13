@@ -1,49 +1,165 @@
-stage('Init Environment') {
-  steps {
-    script {
-      echo "🧭 Using CLOUD_PROVIDER=${env.CLOUD_PROVIDER}"
+pipeline {
+  agent any
 
-      def cloudVars = [
-        oci: [
-          ANSIBLE_INVENTORY:    'ansible/inventory/oci.ini',
-          OCIR_REPO:            'iad.ocir.io/idtijq8cx4jl/prod-site',
-          ANSIBLE_TARGET_HOST:  'oci.prod.pauloazedo.dev',
-          PROD_APP_URL:         'https://oci.prod.pauloazedo.dev'
-        ],
-        aws: [
-          ANSIBLE_INVENTORY:    'ansible/inventory/aws.ini',
-          OCIR_REPO:            'aws_account_id.dkr.ecr.region.amazonaws.com/prod-site',
-          ANSIBLE_TARGET_HOST:  'aws.prod.pauloazedo.dev',
-          PROD_APP_URL:         'https://aws.prod.pauloazedo.dev'
-        ]
-      ]
+  environment {
+    CLOUD_PROVIDER        = "${env.CLOUD_PROVIDER ?: 'oci'}"
+    SSH_KEY_PATH          = '/var/jenkins_home/.ssh/id_rsa'
+    ANSIBLE_REMOTE_USER   = 'devops'
+    JENKINS_MARKER        = '/var/jenkins_home/.jenkins_self_deploy'
+    FRONTEND_SRC_DIR      = './my-portfolio/frontend/'
+    FRONTEND_DST_DIR      = '/home/devops/frontend'
+    IMAGE_TAG             = ''
+    VENV_ACTIVATE         = '/home/jenkins/venv/bin/ansible-playbook'
+  }
 
-      def selected = cloudVars[env.CLOUD_PROVIDER]
-      if (!selected) {
-        error "❌ Unknown CLOUD_PROVIDER: '${env.CLOUD_PROVIDER}'"
+  options {
+    timestamps()
+    ansiColor('xterm')
+  }
+
+  stages {
+
+    stage('Init Environment') {
+      steps {
+        script {
+          echo "🧭 Using CLOUD_PROVIDER=${env.CLOUD_PROVIDER}"
+
+          def cloudVars = [
+            oci: [
+              ANSIBLE_INVENTORY:    'ansible/inventory/oci.ini',
+              OCIR_REPO:            'iad.ocir.io/idtijq8cx4jl/prod-site',
+              ANSIBLE_TARGET_HOST:  'oci.prod.pauloazedo.dev',
+              PROD_APP_URL:         'https://oci.prod.pauloazedo.dev'
+            ],
+            aws: [
+              ANSIBLE_INVENTORY:    'ansible/inventory/aws.ini',
+              OCIR_REPO:            'aws_account_id.dkr.ecr.region.amazonaws.com/prod-site',
+              ANSIBLE_TARGET_HOST:  'aws.prod.pauloazedo.dev',
+              PROD_APP_URL:         'https://aws.prod.pauloazedo.dev'
+            ]
+          ]
+
+          def selected = cloudVars[env.CLOUD_PROVIDER]
+          if (!selected) {
+            error "❌ Unknown CLOUD_PROVIDER: '${env.CLOUD_PROVIDER}'"
+          }
+
+          env.ANSIBLE_INVENTORY   = selected.ANSIBLE_INVENTORY
+          env.OCIR_REPO           = selected.OCIR_REPO
+          env.ANSIBLE_TARGET_HOST = selected.ANSIBLE_TARGET_HOST
+          env.PROD_APP_URL        = selected.PROD_APP_URL
+
+          def tag = sh(script: '''
+            set -e
+            git fetch --tags --force
+            git tag --merged HEAD --sort=-creatordate | grep '^v' | head -n1
+          ''', returnStdout: true).trim()
+
+          if (!tag) {
+            error "❌ No valid tag found. Ensure your release is tagged (e.g. v0.0.30) before merging to main."
+          }
+
+          env.IMAGE_TAG = tag
+          echo "📦 Deploying image version: ${env.IMAGE_TAG}"
+        }
       }
+    }
 
-      env.ANSIBLE_INVENTORY   = selected.ANSIBLE_INVENTORY
-      env.OCIR_REPO           = selected.OCIR_REPO
-      env.ANSIBLE_TARGET_HOST = selected.ANSIBLE_TARGET_HOST
-      env.PROD_APP_URL        = selected.PROD_APP_URL
+    stage('Checkout Source') {
+      steps {
+        checkout scm
+      }
+    }
 
-      // Get latest tag merged to HEAD that starts with 'v'
-      def tag = sh(
-        script: '''
+    stage('Sync Frontend to PROD') {
+      steps {
+        sh '''
           set -e
-          git fetch --tags --force
-          git tag --merged HEAD --sort=-creatordate | grep '^v' | head -n1
-        ''',
-        returnStdout: true
-      ).trim()
+          rsync -az --delete \
+            -e "ssh -i ${SSH_KEY_PATH} -o StrictHostKeyChecking=accept-new" \
+            ${FRONTEND_SRC_DIR} ${ANSIBLE_REMOTE_USER}@${ANSIBLE_TARGET_HOST}:${FRONTEND_DST_DIR}
+        '''
+      }
+    }
 
-      if (!tag) {
-        error "❌ No valid tag found. Ensure your release is tagged (e.g. v0.0.30) before merging to main."
+    stage('Deploy to BLUE Container') {
+      steps {
+        withCredentials([file(credentialsId: 'ansible-vault-passfile', variable: 'VAULT_PASS_FILE')]) {
+          sh '''
+            set -e
+            echo '[INFO] Creating Jenkins self-deployment marker'
+            touch ${JENKINS_MARKER}
+
+            export ANSIBLE_SSH_ARGS="-i ${SSH_KEY_PATH} -o StrictHostKeyChecking=accept-new"
+            export ANSIBLE_REMOTE_USER=${ANSIBLE_REMOTE_USER}
+
+            ${VENV_ACTIVATE} -i ${ANSIBLE_INVENTORY} ansible/prod.yml \
+              --limit prod \
+              --tags prod_site_blue \
+              --extra-vars "prod_site_custom_image=${OCIR_REPO}:${IMAGE_TAG} \
+                            prod_site_image_tag=${IMAGE_TAG}" \
+              --vault-password-file "${VAULT_PASS_FILE}"
+          '''
+        }
       }
 
-      env.IMAGE_TAG = tag
-      echo "📦 Deploying image version: ${env.IMAGE_TAG}"
+      post {
+        always {
+          sh 'rm -f ${JENKINS_MARKER} || true'
+        }
+      }
+    }
+
+    stage('Await Manual Approval to Promote GREEN') {
+      steps {
+        timeout(time: 2, unit: 'HOURS') {
+          input message: "Promote BLUE container to GREEN?", ok: "Approve"
+        }
+      }
+    }
+
+    stage('Promote BLUE to GREEN') {
+      steps {
+        withCredentials([file(credentialsId: 'ansible-vault-passfile', variable: 'VAULT_PASS_FILE')]) {
+          sh '''
+            set -e
+            export ANSIBLE_SSH_ARGS="-i ${SSH_KEY_PATH} -o StrictHostKeyChecking=accept-new"
+            export ANSIBLE_REMOTE_USER=${ANSIBLE_REMOTE_USER}
+
+            ${VENV_ACTIVATE} -i ${ANSIBLE_INVENTORY} ansible/prod.yml \
+              --limit prod \
+              --tags prod_site_promote \
+              --extra-vars "prod_site_image_tag=${IMAGE_TAG}" \
+              --vault-password-file "${VAULT_PASS_FILE}"
+          '''
+        }
+      }
+    }
+  }
+
+  post {
+    success {
+      script {
+        slackSend (
+          channel: '#jenkins_notifications',
+          color: 'good',
+          message: """🟢 *PROD Deployment Completed!*
+• Version: `${env.IMAGE_TAG}`
+• Environment: *${env.CLOUD_PROVIDER.toUpperCase()}*
+• 🔗 <${env.BUILD_URL}|View Jenkins Build>
+• 🌐 <${env.PROD_APP_URL}|Open Live App>"""
+        )
+      }
+    }
+
+    failure {
+      script {
+        slackSend (
+          channel: '#jenkins_notifications',
+          color: 'danger',
+          message: "❌ *PROD Pipeline FAILED* for `${env.IMAGE_TAG}`.\n🔗 <${env.BUILD_URL}|View Jenkins Build>"
+        )
+      }
     }
   }
 }
