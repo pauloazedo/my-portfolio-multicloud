@@ -55,9 +55,13 @@ pipeline {
           env.ANSIBLE_TARGET_HOST = selected.ANSIBLE_TARGET_HOST
           env.PROD_APP_URL        = selected.PROD_APP_URL
 
-          // Safely extract tag pointing at HEAD
+          // Fetch latest tags and get the tag pointing at HEAD
           def tag = sh(
-            script: 'git fetch --tags --force && git tag --points-at HEAD | grep ^v | head -n1',
+            script: '''
+              set -e
+              git fetch --tags --force
+              git tag --points-at HEAD | grep '^v' | head -n1
+            ''',
             returnStdout: true
           ).trim()
 
