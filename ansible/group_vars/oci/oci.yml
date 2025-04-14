@@ -18,12 +18,12 @@ jenkins_volume_role: jenkins_volume
 ocir_namespace: "idtijq8cx4jl"
 
 # UAT image references
-uat_site_ocir_repo: "iad.ocir.io/{{ ocir_namespace }}/uat-site"
+uat_site_ocir_repo: "iad.ocir.io/{{ ocir_namespace }}/my-portfolio-site"
 uat_site_image: "{{ uat_site_ocir_repo }}:{{ uat_site_image_tag | default('latest') }}"
 uat_site_waiting_image: "iad.ocir.io/{{ ocir_namespace }}/uat-waiting:latest"
 
 # PROD repository base (image will be dynamically set using the latest tag)
-prod_site_ocir_repo: "iad.ocir.io/{{ ocir_namespace }}/prod-site"
+prod_site_ocir_repo: "iad.ocir.io/{{ ocir_namespace }}/my-portfolio-site"
 
 # Fallback image for PROD (static)
 prod_site_waiting_image: "iad.ocir.io/{{ ocir_namespace }}/prod-waiting:latest"

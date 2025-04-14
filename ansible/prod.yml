@@ -61,4 +61,6 @@
     - name: Deploy PROD container(s) based on prod_site_target
       ansible.builtin.include_role:
         name: prod_site
-      tags: prod_site
+      tags:
+        - prod_site
+        - fallback

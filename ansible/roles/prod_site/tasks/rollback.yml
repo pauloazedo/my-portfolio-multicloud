@@ -1,6 +1,6 @@
 ---
 # ansible/roles/prod_site/tasks/rollback.yml
-# Rollback the green container to the last known good version
+# Rollback the green container to the last known good version from shared OCIR repo
 
 #####################################################################
 # Step 1: Read last promoted version tag from file
@@ -14,7 +14,7 @@
 - name: Decode and set rollback image tag
   ansible.builtin.set_fact:
     rollback_version_tag: "{{ rollback_tag_raw['content'] | b64decode | trim }}"
-    rollback_image: "iad.ocir.io/{{ ocir_namespace }}/prod-site:{{ rollback_version_tag }}"
+    rollback_image: "{{ prod_site_ocir_repo }}:{{ rollback_version_tag }}"
 
 - name: Show rollback version being restored
   ansible.builtin.debug:

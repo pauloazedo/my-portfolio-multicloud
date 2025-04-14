@@ -82,8 +82,9 @@
 # Step 6: Fallback Preparation (if image is not available)
 ############################################################
 - name: Fallback setup block
+  when: not uat_image_available | default(false)
+  tags: [uat_site, fallback]
   block:
-
     - name: Set fallback variables
       ansible.builtin.set_fact:
         fallback_color: blue
@@ -129,9 +130,6 @@
         owner: devops
         group: devops
         mode: '0644'
-
-  when: not uat_image_available | default(false)
-  tags: [uat_site, fallback]
 
 ############################################################
 # Step 7: Run appropriate container

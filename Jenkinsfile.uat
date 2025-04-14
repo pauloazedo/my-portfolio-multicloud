@@ -27,13 +27,13 @@ pipeline {
           def cloudVars = [
             oci: [
               ANSIBLE_INVENTORY: 'ansible/inventory/oci.ini',
-              OCIR_REPO:         'iad.ocir.io/idtijq8cx4jl/uat-site',
+              OCIR_REPO:         'iad.ocir.io/idtijq8cx4jl/my-portfolio-site',
               ANSIBLE_TARGET_HOST: 'oci.uat.pauloazedo.dev',
               UAT_APP_URL:         'https://oci.uat.pauloazedo.dev'
             ],
             aws: [
               ANSIBLE_INVENTORY: 'ansible/inventory/aws.ini',
-              OCIR_REPO:         'aws_account_id.dkr.ecr.region.amazonaws.com/uat-site', // Replace when ready
+              OCIR_REPO:         'aws_account_id.dkr.ecr.region.amazonaws.com/my-portfolio-site', // Replace when ready
               ANSIBLE_TARGET_HOST: 'aws.uat.pauloazedo.dev',
               UAT_APP_URL:         'https://aws.uat.pauloazedo.dev'
             ]

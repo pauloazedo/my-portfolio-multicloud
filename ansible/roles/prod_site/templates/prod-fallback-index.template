@@ -41,6 +41,12 @@
             padding-left: 0.5rem;
             color: ${FALLBACK_COLOR};
         }
+        .env-label2 {
+            padding-left: 0.5rem;
+            color: ${FALLBACK_COLOR};
+            font-size: 2.5rem;
+            margin-bottom: 1rem;
+        }
         .fallback-tag {
             margin-top: 2rem;
             font-size: 0.9rem;
@@ -52,7 +58,7 @@
 </head>
 <body>
     <h1>
-        PROD <span class="h1">${FALLBACK_LABEL}</span> Environment Ready
+        PROD<span class="env-label2">${FALLBACK_LABEL}</span> Environment Ready
     </h1>
     <p>
         Waiting for
