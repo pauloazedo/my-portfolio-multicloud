@@ -55,7 +55,7 @@ pipeline {
           env.ANSIBLE_TARGET_HOST = selected.ANSIBLE_TARGET_HOST
           env.PROD_APP_URL        = selected.PROD_APP_URL
 
-          // Fetch latest tags and get the tag pointing at HEAD
+          // FIX: ensure grep runs before head to avoid empty result
           def tag = sh(
             script: '''
               set -e
@@ -106,7 +106,6 @@ pipeline {
           '''
         }
       }
-
       post {
         always {
           sh 'rm -f ${JENKINS_MARKER} || true'
