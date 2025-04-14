@@ -93,15 +93,10 @@ resource "cloudflare_dns_record" "oci_jenkins" {
 }
 
 # === OCI CONTAINER REPOSITORIES ===
+
 resource "oci_artifacts_container_repository" "uat_waiting" {
   compartment_id = oci_identity_compartment.devops_portfolio.id
   display_name   = "uat-waiting"
-  is_public      = false
-}
-
-resource "oci_artifacts_container_repository" "uat_site" {
-  compartment_id = oci_identity_compartment.devops_portfolio.id
-  display_name   = "uat-site"
   is_public      = false
 }
 
@@ -111,8 +106,8 @@ resource "oci_artifacts_container_repository" "prod_waiting" {
   is_public      = false
 }
 
-resource "oci_artifacts_container_repository" "prod_site" {
+resource "oci_artifacts_container_repository" "my_portfolio_site" {
   compartment_id = oci_identity_compartment.devops_portfolio.id
-  display_name   = "prod-site"
+  display_name   = "my-portfolio-site"
   is_public      = false
 }

@@ -31,55 +31,69 @@
 #####################################################################
 # Step 3: Discover the latest prod-site image tag from OCIR
 #####################################################################
-- name: Fetch latest prod-site tag from OCIR
+- name: Try to fetch latest prod-site tag from OCIR
   ansible.builtin.shell: |
     set -o pipefail
     curl -s -H "Authorization: Bearer {{ ocir_token }}" \
-      https://iad.ocir.io/v2/{{ ocir_namespace }}/prod-site/tags/list |
-    jq -r '.tags | sort | reverse | .[0]'
+      https://iad.ocir.io/v2/{{ ocir_namespace }}/{{ prod_site_ocir_repo | regex_replace('^.*?/', '') }}/tags/list |
+    jq -r 'select(.tags != null) | .tags | sort | reverse | .[0]'
   register: latest_tag_result
   changed_when: false
-  failed_when: latest_tag_result.rc != 0 or latest_tag_result.stdout == ""
+  failed_when: false
+  when: not force_fallback | default(false)
 
 - name: Set latest tag and define image references
   ansible.builtin.set_fact:
-    latest_prod_site_tag: "{{ latest_tag_result.stdout }}"
-    prod_site_blue_image: "iad.ocir.io/{{ ocir_namespace }}/prod-site:{{ latest_prod_site_tag }}"
-    prod_site_green_image: "iad.ocir.io/{{ ocir_namespace }}/prod-site:{{ latest_prod_site_tag }}"
+    latest_prod_site_tag: "{{ latest_tag_result.stdout | default('') }}"
+    prod_site_blue_image: "{{ prod_site_ocir_repo }}:{{ latest_tag_result.stdout }}"
+    prod_site_green_image: "{{ prod_site_ocir_repo }}:{{ latest_tag_result.stdout }}"
+  when: (latest_tag_result is defined) and (latest_tag_result.stdout != "")
 
 - name: Show tag being deployed
   ansible.builtin.debug:
-    msg: "Deploying prod-site version {{ latest_prod_site_tag }} to blue/green"
+    msg: "Deploying prod-site version {{ latest_prod_site_tag }}"
+  when: (latest_tag_result is defined) and (latest_tag_result.stdout != "")
 
 #####################################################################
 # Step 4: Check image availability
 #####################################################################
 - name: Check availability of versioned images
   ansible.builtin.include_tasks: check_images.yml
+  when:
+    - not (force_fallback | default(false))
+    - latest_tag_result is defined
+    - latest_tag_result.stdout != ""
   tags: fallback
 
 #####################################################################
-# Step 5: Fallback logic (build and push if image not found)
+# Step 5: Run fallback logic if no tags were found or forced
 #####################################################################
-- name: Build and push fallback image
+- name: Skip blue/green deploy and run fallback if no image is available
   ansible.builtin.include_tasks: run-fallback.yml
   when:
     - force_fallback | default(false)
-    - not (blue_image_available | default(false)) and not (green_image_available | default(false))
+      or (latest_tag_result is defined and latest_tag_result.stdout == "")
   tags:
     - fallback
-    - force-fallback
 
 #####################################################################
 # Step 6: Deploy blue and green containers
 #####################################################################
 - name: Deploy blue container
   ansible.builtin.include_tasks: run-blue.yml
-  when: prod_site_target in ["both", "blue"]
+  when:
+    - not (force_fallback | default(false))
+    - latest_tag_result is defined
+    - latest_tag_result.stdout != ""
+    - prod_site_target in ["both", "blue"]
 
 - name: Deploy green container
   ansible.builtin.include_tasks: run-green.yml
-  when: prod_site_target in ["both", "green"]
+  when:
+    - not (force_fallback | default(false))
+    - latest_tag_result is defined
+    - latest_tag_result.stdout != ""
+    - prod_site_target in ["both", "green"]
 
 #####################################################################
 # Step 7: Cleanup fallback artifacts
@@ -87,6 +101,9 @@
 - name: Cleanup fallback for blue
   ansible.builtin.include_tasks: cleanup-blue.yml
   when:
+    - not (force_fallback | default(false))
+    - latest_tag_result is defined
+    - latest_tag_result.stdout != ""
     - prod_site_target in ["both", "blue"]
     - not (blue_image_available | default(false)) and not (green_image_available | default(false))
   tags: fallback
@@ -94,6 +111,9 @@
 - name: Cleanup fallback for green
   ansible.builtin.include_tasks: cleanup-green.yml
   when:
+    - not (force_fallback | default(false))
+    - latest_tag_result is defined
+    - latest_tag_result.stdout != ""
     - prod_site_target in ["both", "green"]
     - not (blue_image_available | default(false)) and not (green_image_available | default(false))
   tags: fallback

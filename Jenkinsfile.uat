@@ -27,7 +27,7 @@ pipeline {
           def cloudVars = [
             oci: [
               ANSIBLE_INVENTORY: 'ansible/inventory/oci.ini',
-              OCIR_REPO:         'iad.ocir.io/idtijq8cx4jl/uat-site',
+              OCIR_REPO:         'iad.ocir.io/idtijq8cx4jl/my-portfolio-site',
               ANSIBLE_TARGET_HOST: 'oci.uat.pauloazedo.dev',
               UAT_APP_URL:         'https://oci.uat.pauloazedo.dev'
             ],

@@ -1,4 +1,3 @@
----
 # ansible/roles/prod_site/tasks/run-fallback.yml
 # Build and deploy dynamic fallback PROD image to OCIR, used by both blue and green containers.
 
@@ -10,10 +9,6 @@
       force_fallback={{ force_fallback | default(false) }}
   tags: fallback
 
-############################################################
-# Step 1: Prepare fallback Docker build context
-############################################################
-
 - name: Copy fallback Dockerfile
   ansible.builtin.copy:
     src: files/prod-waiting.Dockerfile
@@ -21,6 +16,7 @@
     owner: devops
     group: devops
     mode: '0644'
+  tags: fallback
 
 - name: Copy fallback NGINX config
   ansible.builtin.copy:
@@ -29,6 +25,7 @@
     owner: devops
     group: devops
     mode: '0644'
+  tags: fallback
 
 - name: Copy fallback HTML template with ${...} placeholders
   ansible.builtin.copy:
@@ -37,10 +34,7 @@
     owner: devops
     group: devops
     mode: '0644'
-
-############################################################
-# Step 2: Build fallback Docker image
-############################################################
+  tags: fallback
 
 - name: Build fallback PROD image
   community.docker.docker_image:
@@ -56,49 +50,44 @@
         org.opencontainers.image.description: "Dynamic fallback PROD site – waiting for Jenkins"
         org.opencontainers.image.source: "ansible"
   register: fallback_build_result
+  tags: fallback
 
 - name: Log fallback image build result
   ansible.builtin.debug:
     msg: "Built fallback PROD image: {{ fallback_build_result.image }}"
-
-############################################################
-# Step 3: Tag and push fallback image to OCIR
-############################################################
+  tags: fallback
 
 - name: Tag fallback image for OCIR
   ansible.builtin.command:
     cmd: docker tag prod-waiting:latest {{ prod_site_waiting_image }}
   changed_when: true
+  tags: fallback
 
 - name: Push fallback image to OCIR
   ansible.builtin.command:
     cmd: docker push {{ prod_site_waiting_image }}
   changed_when: true
   register: fallback_push_result
+  tags: fallback
 
 - name: Log fallback image push result
   ansible.builtin.debug:
     msg: "Pushed fallback image to OCIR: {{ fallback_push_result.stdout_lines | default([]) }}"
-
-############################################################
-# Step 4: Stop any existing fallback containers
-############################################################
+  tags: fallback
 
 - name: Stop and remove existing blue fallback container
   community.docker.docker_container:
     name: prod_site_blue
     state: absent
     force_kill: true
+  tags: fallback
 
 - name: Stop and remove existing green fallback container
   community.docker.docker_container:
     name: prod_site_green
     state: absent
     force_kill: true
-
-############################################################
-# Step 5: Start new fallback containers with dynamic ENV
-############################################################
+  tags: fallback
 
 - name: Run fallback blue container
   community.docker.docker_container:
@@ -108,16 +97,17 @@
     restart_policy: unless-stopped
     published_ports:
       - "3200:3000"
-    env:  # noqa var-naming
-      FALLBACK_LABEL: "bblue" # noqa var-naming
-      FALLBACK_COLOR: "blue" # noqa var-naming
-      JENKINS_DOMAIN: "{{ jenkins_fqdn }}" # noqa var-naming
+    env:
+      FALLBACK_LABEL: "BLUE"
+      FALLBACK_COLOR: "blue"
+      JENKINS_DOMAIN: "{{ jenkins_fqdn }}"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3000/"]
       interval: 30s
       timeout: 5s
       retries: 3
       start_period: 10s
+  tags: fallback
 
 - name: Run fallback green container
   community.docker.docker_container:
@@ -127,13 +117,14 @@
     restart_policy: unless-stopped
     published_ports:
       - "3100:3000"
-    env:  # noqa var-naming
-      FALLBACK_COLOR: "greencolor" # noqa var-naming
-      FALLBACK_LABEL: "greenlabel" # noqa var-naming
-      JENKINS_DOMAIN: "{{ jenkins_fqdn }}" # noqa var-naming
+    env:
+      FALLBACK_LABEL: "GREEN"
+      FALLBACK_COLOR: "green"
+      JENKINS_DOMAIN: "{{ jenkins_fqdn }}"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3000/"]
       interval: 30s
       timeout: 5s
       retries: 3
       start_period: 10s
+  tags: fallback
