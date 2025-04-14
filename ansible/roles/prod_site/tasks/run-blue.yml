@@ -1,3 +1,4 @@
+---
 # ansible/roles/prod_site/tasks/run-blue.yml
 # Deploy the PROD Blue container using the latest tagged image or fallback
 
@@ -28,7 +29,24 @@
       - "{{ prod_site_blue_port }}:3000"
     recreate: true
     state: started
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
   when: blue_image_available | bool
+  tags:
+    - prod_site
+    - deploy
+
+- name: Log skipping blue deploy – image not available
+  ansible.builtin.debug:
+    msg: "Blue image not available — fallback container will be used."
+  when: not blue_image_available | default(false) | bool
+  tags:
+    - prod_site
+    - fallback
 
 #####################################################################
 # Step 3: Run blue container with fallback image (if needed)
@@ -43,6 +61,7 @@
     recreate: true
     state: started
     env: "{{ prod_site_blue_env }}"
-  when: not (blue_image_available | default(false) | bool)
+  when: not blue_image_available | default(false) | bool
   tags:
+    - prod_site
     - fallback

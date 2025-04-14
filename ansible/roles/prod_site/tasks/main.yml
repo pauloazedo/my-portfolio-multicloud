@@ -63,7 +63,7 @@
     - not (force_fallback | default(false))
     - latest_tag_result is defined
     - latest_tag_result.stdout != ""
-  tags: fallback
+  tags: [fallback, prod_site]
 
 #####################################################################
 # Step 5: Run fallback logic if no tags were found or forced
