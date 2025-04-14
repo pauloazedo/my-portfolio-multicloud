@@ -8,7 +8,6 @@ pipeline {
     JENKINS_MARKER        = '/var/jenkins_home/.jenkins_self_deploy'
     FRONTEND_SRC_DIR      = './my-portfolio/frontend/'
     FRONTEND_DST_DIR      = '/home/devops/frontend'
-    IMAGE_TAG             = ''
     VENV_ACTIVATE         = '/home/jenkins/venv/bin/ansible-playbook'
   }
 
@@ -33,13 +32,11 @@ pipeline {
           def cloudVars = [
             oci: [
               ANSIBLE_INVENTORY:    'ansible/inventory/oci.ini',
-              OCIR_REPO:            'iad.ocir.io/idtijq8cx4jl/prod-site',
               ANSIBLE_TARGET_HOST:  'oci.prod.pauloazedo.dev',
               PROD_APP_URL:         'https://oci.prod.pauloazedo.dev'
             ],
             aws: [
               ANSIBLE_INVENTORY:    'ansible/inventory/aws.ini',
-              OCIR_REPO:            'aws_account_id.dkr.ecr.region.amazonaws.com/prod-site',
               ANSIBLE_TARGET_HOST:  'aws.prod.pauloazedo.dev',
               PROD_APP_URL:         'https://aws.prod.pauloazedo.dev'
             ]
@@ -51,25 +48,8 @@ pipeline {
           }
 
           env.ANSIBLE_INVENTORY   = selected.ANSIBLE_INVENTORY
-          env.OCIR_REPO           = selected.OCIR_REPO
           env.ANSIBLE_TARGET_HOST = selected.ANSIBLE_TARGET_HOST
           env.PROD_APP_URL        = selected.PROD_APP_URL
-
-          def tag = sh(
-            script: '''
-              set -e
-              git fetch --tags --force
-              git describe --tags --abbrev=0
-            ''',
-            returnStdout: true
-          ).trim()
-
-          if (!tag) {
-            error "❌ No reachable tag found. Please tag a commit before pushing to main."
-          }
-
-          env.IMAGE_TAG = tag
-          echo "📦 Deploying image version: ${env.IMAGE_TAG}"
         }
       }
     }
@@ -99,8 +79,6 @@ pipeline {
             ${VENV_ACTIVATE} -i ${ANSIBLE_INVENTORY} ansible/prod.yml \
               --limit prod \
               --tags prod_site_blue \
-              --extra-vars "prod_site_custom_image=${OCIR_REPO}:${IMAGE_TAG} \
-                            prod_site_image_tag=${IMAGE_TAG}" \
               --vault-password-file "${VAULT_PASS_FILE}"
           '''
         }
@@ -130,8 +108,7 @@ pipeline {
 
             ${VENV_ACTIVATE} -i ${ANSIBLE_INVENTORY} ansible/prod.yml \
               --limit prod \
-              --tags prod_site_promote \
-              --extra-vars "prod_site_image_tag=${IMAGE_TAG}" \
+              --tags prod_site_green \
               --vault-password-file "${VAULT_PASS_FILE}"
           '''
         }
@@ -146,7 +123,6 @@ pipeline {
           channel: '#jenkins_notifications',
           color: 'good',
           message: """🟢 *PROD Deployment Completed!*
-• Version: `${env.IMAGE_TAG}`
 • Environment: *${env.CLOUD_PROVIDER.toUpperCase()}*
 • 🔗 <${env.BUILD_URL}|View Jenkins Build>
 • 🌐 <${env.PROD_APP_URL}|Open Live App>"""
@@ -159,7 +135,7 @@ pipeline {
         slackSend (
           channel: '#jenkins_notifications',
           color: 'danger',
-          message: "❌ *PROD Pipeline FAILED* for `${env.IMAGE_TAG}`.\n🔗 <${env.BUILD_URL}|View Jenkins Build>"
+          message: "❌ *PROD Pipeline FAILED*.\n🔗 <${env.BUILD_URL}|View Jenkins Build>"
         )
       }
     }

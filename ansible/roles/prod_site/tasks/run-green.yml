@@ -1,29 +1,29 @@
 ---
 # ansible/roles/prod_site/tasks/run-green.yml
-# Deploy the PROD Green container, with fallback if needed
+# Deploy the PROD Green container using the latest tagged image or fallback
 
-############################################################
+#####################################################################
 # Step 1: Remove existing green container (if any)
-############################################################
-- name: Remove existing green container
+#####################################################################
+- name: Remove existing green container if present
   community.docker.docker_container:
     name: "{{ prod_site_green_container }}"
     state: absent
     force_kill: true
-  ignore_errors: true
   register: green_cleanup
+  ignore_errors: true
 
-- name: Log cleanup result
+- name: Log green container cleanup result
   ansible.builtin.debug:
     msg: "Removed existing green container: {{ green_cleanup.changed }}"
 
-############################################################
-# Step 2: Run green container with real image (if available)
-############################################################
-- name: Run green container with real image
+#####################################################################
+# Step 2: Run green container with latest versioned image
+#####################################################################
+- name: Run green container with versioned image ({{ latest_prod_site_tag }})
   community.docker.docker_container:
     name: "{{ prod_site_green_container }}"
-    image: "{{ prod_site_green_image }}"
+    image: "{{ latest_prod_site_image }}"
     restart_policy: always
     published_ports:
       - "{{ prod_site_green_port }}:3000"
@@ -31,9 +31,18 @@
     state: started
   when: green_image_available | default(false)
 
-############################################################
+- name: Persist promoted green version for rollback
+  ansible.builtin.copy:
+    dest: /home/devops/last-promoted-green.txt
+    content: "{{ latest_prod_site_tag }}"
+    owner: devops
+    group: devops
+    mode: '0644'
+  when: green_image_available | default(false)
+
+#####################################################################
 # Step 3: Run green container with fallback image (if needed)
-############################################################
+#####################################################################
 - name: Run green container with fallback image
   community.docker.docker_container:
     name: "{{ prod_site_green_container }}"
@@ -45,4 +54,5 @@
     state: started
     env: "{{ prod_site_green_env }}"
   when: not green_image_available | default(false)
-  tags: fallback
+  tags:
+    - fallback

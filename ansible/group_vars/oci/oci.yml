@@ -1,4 +1,6 @@
+# ansible/group_vars/oci/oci.yml
 # OCI-specific configuration
+
 cloud_provider: oci
 
 ############################################################
@@ -15,13 +17,15 @@ jenkins_volume_role: jenkins_volume
 ############################################################
 ocir_namespace: "idtijq8cx4jl"
 
-# Image URIs
+# UAT image references
 uat_site_ocir_repo: "iad.ocir.io/{{ ocir_namespace }}/uat-site"
 uat_site_image: "{{ uat_site_ocir_repo }}:{{ uat_site_image_tag | default('latest') }}"
 uat_site_waiting_image: "iad.ocir.io/{{ ocir_namespace }}/uat-waiting:latest"
 
-prod_site_green_image: "iad.ocir.io/{{ ocir_namespace }}/prod-site:green"
-prod_site_blue_image:  "iad.ocir.io/{{ ocir_namespace }}/prod-site:blue"
+# PROD repository base (image will be dynamically set using the latest tag)
+prod_site_ocir_repo: "iad.ocir.io/{{ ocir_namespace }}/prod-site"
+
+# Fallback image for PROD (static)
 prod_site_waiting_image: "iad.ocir.io/{{ ocir_namespace }}/prod-waiting:latest"
 
 ############################################################
@@ -65,5 +69,8 @@ prod_site_green_port:      3100
 
 prod_site_blue_container:  "prod-site-blue"
 prod_site_blue_port:       3200
+
+# This will be set dynamically at runtime:
+# latest_prod_site_image: "{{ prod_site_ocir_repo }}:v0.0.48"
 
 force_fallback: false

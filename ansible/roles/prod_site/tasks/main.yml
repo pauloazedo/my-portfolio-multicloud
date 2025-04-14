@@ -1,4 +1,3 @@
----
 # ansible/roles/prod_site/tasks/main.yml
 # PROD Site Blue/Green Deployment Logic with Fallback
 
@@ -30,25 +29,49 @@
   changed_when: false
 
 #####################################################################
-# Step 3: Check if blue/green images exist or fallback is needed
+# Step 3: Discover the latest prod-site image tag from OCIR
 #####################################################################
-- name: Check availability of green/blue images
+- name: Get latest prod-site image tag from OCIR
+  ansible.builtin.shell: |
+    set -o pipefail
+    curl -s -H "Authorization: Bearer {{ ocir_token }}" \
+      https://iad.ocir.io/v2/{{ ocir_namespace }}/prod-site/tags/list |
+    jq -r '.tags | sort | reverse | .[0]'
+  register: latest_tag_result
+  failed_when: latest_tag_result.rc != 0 or latest_tag_result.stdout == ""
+  changed_when: false
+
+- name: Set latest prod-site tag as fact and define blue/green image references
+  ansible.builtin.set_fact:
+    latest_prod_site_tag: "{{ latest_tag_result.stdout }}"
+    prod_site_blue_image: "iad.ocir.io/{{ ocir_namespace }}/prod-site:{{ latest_tag_result.stdout }}"
+    prod_site_green_image: "iad.ocir.io/{{ ocir_namespace }}/prod-site:{{ latest_tag_result.stdout }}"
+
+- name: Show image tag being deployed
+  ansible.builtin.debug:
+    msg: "Deploying prod-site version {{ latest_prod_site_tag }} to blue/green"
+
+#####################################################################
+# Step 4: Check image availability
+#####################################################################
+- name: Check availability of versioned prod-site images
   ansible.builtin.include_tasks: check_images.yml
   tags: fallback
 
 #####################################################################
-# Step 4: Build and push fallback image if both images are missing
+# Step 5: Fallback logic (build and push if image not found)
 #####################################################################
 - name: Build and push fallback image
   ansible.builtin.include_tasks: run-fallback.yml
   when:
-    - force_fallback | default(false) or (not green_image_available and not blue_image_available)
+    - force_fallback | default(false)
+    - not blue_image_available and not green_image_available
   tags:
     - fallback
     - force-fallback
 
 #####################################################################
-# Step 5: Deploy environments
+# Step 6: Run containers
 #####################################################################
 - name: Deploy to blue environment
   ansible.builtin.include_tasks: run-blue.yml
@@ -59,22 +82,25 @@
   when: prod_site_target in ["both", "green"]
 
 #####################################################################
-# Step 6: Cleanup fallback containers (blue/green)
+# Step 7: Cleanup fallback containers
 #####################################################################
 - name: Cleanup fallback resources for blue
   ansible.builtin.include_tasks: cleanup-blue.yml
   when:
     - prod_site_target in ["both", "blue"]
-    - not green_image_available and not blue_image_available
+    - not blue_image_available and not green_image_available
   tags: fallback
 
 - name: Cleanup fallback resources for green
   ansible.builtin.include_tasks: cleanup-green.yml
   when:
     - prod_site_target in ["both", "green"]
-    - not green_image_available and not blue_image_available
+    - not blue_image_available and not green_image_available
   tags: fallback
 
+#####################################################################
+# Step 8: Docker system cleanup
+#####################################################################
 - name: Final Docker system cleanup to reclaim disk space
   ansible.builtin.import_tasks: docker-prune.yml
   tags: [prod_site, cleanup]
