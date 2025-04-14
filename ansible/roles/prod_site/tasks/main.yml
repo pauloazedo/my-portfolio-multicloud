@@ -1,13 +1,20 @@
+---
 # ansible/roles/prod_site/tasks/main.yml
 # PROD Site Blue/Green Deployment Logic with Fallback
 
 #####################################################################
-# Step 1: Ensure Docker is installed on the PROD host
+# Step 1: Ensure Docker and jq are installed on the PROD host
 #####################################################################
 - name: Ensure Docker is installed
   ansible.builtin.include_role:
     name: docker
   tags: always
+
+- name: Ensure jq is installed (required for tag discovery)
+  ansible.builtin.package:
+    name: jq
+    state: present
+  tags: prod_site
 
 #####################################################################
 # Step 2: Authenticate with OCIR (Oracle Container Registry)
@@ -35,11 +42,11 @@
   ansible.builtin.shell: |
     set -o pipefail
     curl -s -H "Authorization: Bearer {{ ocir_token }}" \
-      https://iad.ocir.io/v2/{{ ocir_namespace }}/{{ prod_site_ocir_repo | regex_replace('^.*?/', '') }}/tags/list |
-    jq -r 'select(.tags != null) | .tags | sort | reverse | .[0]'
+      https://iad.ocir.io/v2/{{ ocir_namespace }}/my-portfolio-site/tags/list | \
+    jq -r '.tags | map(select(startswith("v"))) | sort | last'
   register: latest_tag_result
   changed_when: false
-  failed_when: false
+  failed_when: latest_tag_result.rc != 0 or latest_tag_result.stdout == ""
   when: not force_fallback | default(false)
 
 - name: Set latest tag and define image references
@@ -47,12 +54,18 @@
     latest_prod_site_tag: "{{ latest_tag_result.stdout | default('') }}"
     prod_site_blue_image: "{{ prod_site_ocir_repo }}:{{ latest_tag_result.stdout }}"
     prod_site_green_image: "{{ prod_site_ocir_repo }}:{{ latest_tag_result.stdout }}"
-  when: (latest_tag_result is defined) and (latest_tag_result.stdout != "")
+  when: latest_tag_result.stdout != ""
 
 - name: Show tag being deployed
   ansible.builtin.debug:
     msg: "Deploying prod-site version {{ latest_prod_site_tag }}"
-  when: (latest_tag_result is defined) and (latest_tag_result.stdout != "")
+  when: latest_tag_result.stdout != ""
+
+- name: Fail if no valid tag was found in OCIR
+  ansible.builtin.fail:
+    msg: "No versioned tag (e.g., v0.0.X) found in OCIR. Aborting deployment."
+  when: latest_tag_result.stdout == ""
+    and not force_fallback | default(false)
 
 #####################################################################
 # Step 4: Check image availability
@@ -61,7 +74,6 @@
   ansible.builtin.include_tasks: check_images.yml
   when:
     - not (force_fallback | default(false))
-    - latest_tag_result is defined
     - latest_tag_result.stdout != ""
   tags: [fallback, prod_site]
 
@@ -72,9 +84,8 @@
   ansible.builtin.include_tasks: run-fallback.yml
   when:
     - force_fallback | default(false)
-      or (latest_tag_result is defined and latest_tag_result.stdout == "")
-  tags:
-    - fallback
+      or latest_tag_result.stdout == ""
+  tags: fallback
 
 #####################################################################
 # Step 6: Deploy blue and green containers
@@ -83,7 +94,6 @@
   ansible.builtin.include_tasks: run-blue.yml
   when:
     - not (force_fallback | default(false))
-    - latest_tag_result is defined
     - latest_tag_result.stdout != ""
     - prod_site_target in ["both", "blue"]
 
@@ -91,7 +101,6 @@
   ansible.builtin.include_tasks: run-green.yml
   when:
     - not (force_fallback | default(false))
-    - latest_tag_result is defined
     - latest_tag_result.stdout != ""
     - prod_site_target in ["both", "green"]
 
@@ -102,7 +111,6 @@
   ansible.builtin.include_tasks: cleanup-blue.yml
   when:
     - not (force_fallback | default(false))
-    - latest_tag_result is defined
     - latest_tag_result.stdout != ""
     - prod_site_target in ["both", "blue"]
     - not (blue_image_available | default(false)) and not (green_image_available | default(false))
@@ -112,7 +120,6 @@
   ansible.builtin.include_tasks: cleanup-green.yml
   when:
     - not (force_fallback | default(false))
-    - latest_tag_result is defined
     - latest_tag_result.stdout != ""
     - prod_site_target in ["both", "green"]
     - not (blue_image_available | default(false)) and not (green_image_available | default(false))
