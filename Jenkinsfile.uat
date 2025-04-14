@@ -33,7 +33,7 @@ pipeline {
             ],
             aws: [
               ANSIBLE_INVENTORY: 'ansible/inventory/aws.ini',
-              OCIR_REPO:         'aws_account_id.dkr.ecr.region.amazonaws.com/uat-site', // Replace when ready
+              OCIR_REPO:         'aws_account_id.dkr.ecr.region.amazonaws.com/my-portfolio-site', // Replace when ready
               ANSIBLE_TARGET_HOST: 'aws.uat.pauloazedo.dev',
               UAT_APP_URL:         'https://aws.uat.pauloazedo.dev'
             ]
