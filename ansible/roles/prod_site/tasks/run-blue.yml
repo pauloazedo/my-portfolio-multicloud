@@ -1,4 +1,3 @@
----
 # ansible/roles/prod_site/tasks/run-blue.yml
 # Deploy the PROD Blue container using the latest tagged image or fallback
 
@@ -18,18 +17,18 @@
     msg: "Removed existing blue container: {{ blue_cleanup.changed }}"
 
 #####################################################################
-# Step 2: Run blue container with latest versioned image
+# Step 2: Run blue container with versioned image
 #####################################################################
 - name: Run blue container with versioned image ({{ latest_prod_site_tag }})
   community.docker.docker_container:
     name: "{{ prod_site_blue_container }}"
-    image: "{{ latest_prod_site_image }}"
+    image: "{{ prod_site_blue_image }}"
     restart_policy: always
     published_ports:
       - "{{ prod_site_blue_port }}:3000"
     recreate: true
     state: started
-  when: blue_image_available | default(false)
+  when: blue_image_available | bool
 
 #####################################################################
 # Step 3: Run blue container with fallback image (if needed)
@@ -44,6 +43,6 @@
     recreate: true
     state: started
     env: "{{ prod_site_blue_env }}"
-  when: not blue_image_available | default(false)
+  when: not (blue_image_available | default(false) | bool)
   tags:
     - fallback

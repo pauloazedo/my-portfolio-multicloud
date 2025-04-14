@@ -1,4 +1,3 @@
----
 # ansible/roles/prod_site/tasks/check_images.yml
 # Pull latest versioned blue/green images from OCIR and check availability
 
@@ -29,16 +28,30 @@
     - fallback
 
 #####################################################################
-# Step 3: Set image availability flags
+# Step 3: Set image availability flags based on local image check
 #####################################################################
+- name: Inspect local green image
+  community.docker.docker_image_info:
+    name: "{{ prod_site_green_image }}"
+  register: green_image_info
+  failed_when: false
+  changed_when: false
+  tags:
+    - fallback
+
+- name: Inspect local blue image
+  community.docker.docker_image_info:
+    name: "{{ prod_site_blue_image }}"
+  register: blue_image_info
+  failed_when: false
+  changed_when: false
+  tags:
+    - fallback
+
 - name: Set image availability flags for blue/green
   ansible.builtin.set_fact:
-    green_image_available: >-
-      {{ 'Image is up to date' in green_image_check.msg
-         or 'Downloaded newer image' in green_image_check.msg }}
-    blue_image_available: >-
-      {{ 'Image is up to date' in blue_image_check.msg
-         or 'Downloaded newer image' in blue_image_check.msg }}
+    green_image_available: "{{ green_image_info.images | length > 0 }}"
+    blue_image_available: "{{ blue_image_info.images | length > 0 }}"
   tags:
     - fallback
 
@@ -49,7 +62,7 @@
   ansible.builtin.debug:
     msg:
       - "Latest prod-site tag: {{ latest_prod_site_tag }}"
-      - "Green image available: {{ green_image_available | default(false) }}"
-      - "Blue image available:  {{ blue_image_available | default(false) }}"
+      - "Green image available: {{ green_image_available }}"
+      - "Blue image available:  {{ blue_image_available }}"
   tags:
     - fallback
