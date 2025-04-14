@@ -55,18 +55,17 @@ pipeline {
           env.ANSIBLE_TARGET_HOST = selected.ANSIBLE_TARGET_HOST
           env.PROD_APP_URL        = selected.PROD_APP_URL
 
-          // FIX: ensure grep runs before head to avoid empty result
           def tag = sh(
             script: '''
               set -e
               git fetch --tags --force
-              git tag --points-at HEAD | grep '^v' | head -n1
+              git describe --tags --abbrev=0
             ''',
             returnStdout: true
           ).trim()
 
           if (!tag) {
-            error "❌ No tag found pointing at HEAD. Make sure to tag the commit before merging it to main."
+            error "❌ No reachable tag found. Please tag a commit before pushing to main."
           }
 
           env.IMAGE_TAG = tag
