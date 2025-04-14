@@ -1,7 +1,8 @@
 ---
+# ansible/prod.yml
 # PROD Infrastructure and Application Deployment (Blue/Green)
 
-- name: Setup base infrastructure and deploy both containers by default
+- name: Setup base infrastructure and deploy blue/green containers
   hosts: prod
   become: true
 
@@ -11,12 +12,16 @@
     - group_vars/{{ cloud_provider }}/{{ cloud_provider }}.yml
     - group_vars/{{ cloud_provider }}/{{ cloud_provider }}.secrets.yml
 
-  # Set a static default; Jenkins can still override with `-e prod_site_target=blue|green|both`
+  # Default target is both (can be overridden by CLI extra-vars or Jenkins tags)
   vars:
     prod_site_target: "both"
 
   tasks:
-    # Step 1: Infrastructure setup
+
+    ############################################################
+    # Step 1: Base Infrastructure
+    ############################################################
+
     - name: Include bootstrap role
       ansible.builtin.include_role:
         name: "{{ bootstrap_role }}"
@@ -49,8 +54,30 @@
         name: prod_site
       tags: set_ssh_access
 
-    # Step 2: Always include prod_site for web container deployment
-    - name: Deploy PROD site (blue/green logic inside role)
+    ############################################################
+    # Step 2: Deployment (controlled by tags)
+    ############################################################
+
+    - name: Deploy only to BLUE container
       ansible.builtin.include_role:
         name: prod_site
+      vars:
+        prod_site_target: "blue"
+      when: "'prod_site_blue' in ansible_run_tags"
+      tags: prod_site_blue
+
+    - name: Deploy only to GREEN container
+      ansible.builtin.include_role:
+        name: prod_site
+      vars:
+        prod_site_target: "green"
+      when: "'prod_site_green' in ansible_run_tags"
+      tags: prod_site_green
+
+    - name: Deploy to BOTH containers
+      ansible.builtin.include_role:
+        name: prod_site
+      vars:
+        prod_site_target: "both"
+      when: "'prod_site' in ansible_run_tags"
       tags: prod_site
