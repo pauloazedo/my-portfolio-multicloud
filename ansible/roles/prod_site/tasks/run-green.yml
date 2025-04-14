@@ -1,3 +1,4 @@
+---
 # ansible/roles/prod_site/tasks/run-green.yml
 # Deploy the PROD Green container using the latest tagged image or fallback
 
@@ -29,6 +30,9 @@
     recreate: true
     state: started
   when: green_image_available | bool
+  tags:
+    - prod_site
+    - deploy
 
 - name: Persist promoted green version for rollback
   ansible.builtin.copy:
@@ -38,6 +42,9 @@
     group: devops
     mode: '0644'
   when: green_image_available | bool
+  tags:
+    - prod_site
+    - promote
 
 #####################################################################
 # Step 3: Run green container with fallback image (if needed)
@@ -54,4 +61,5 @@
     env: "{{ prod_site_green_env }}"
   when: not (green_image_available | default(false) | bool)
   tags:
+    - prod_site
     - fallback
