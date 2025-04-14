@@ -12,9 +12,9 @@
     - group_vars/{{ cloud_provider }}/{{ cloud_provider }}.yml
     - group_vars/{{ cloud_provider }}/{{ cloud_provider }}.secrets.yml
 
-  # Default target is 'both', can be overridden via --extra-vars
+  # Only set a default if not passed via --extra-vars
   vars:
-    prod_site_target: "both"
+    prod_site_target: "{{ prod_site_target | default('both') }}"
 
   tasks:
 
