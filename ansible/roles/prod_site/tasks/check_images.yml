@@ -11,6 +11,7 @@
   register: green_image_check
   failed_when: false
   ignore_errors: true
+  tags: [fallback, prod_site]
 
 #####################################################################
 # Step 2: Try pulling blue image
@@ -22,6 +23,7 @@
   register: blue_image_check
   failed_when: false
   ignore_errors: true
+  tags: [fallback, prod_site]
 
 #####################################################################
 # Step 3: Inspect local image presence
@@ -32,6 +34,7 @@
   register: green_image_info
   failed_when: false
   changed_when: false
+  tags: [fallback, prod_site]
 
 - name: Inspect local blue image
   community.docker.docker_image_info:
@@ -39,11 +42,13 @@
   register: blue_image_info
   failed_when: false
   changed_when: false
+  tags: [fallback, prod_site]
 
 - name: Set image availability flags for blue/green
   ansible.builtin.set_fact:
     green_image_available: "{{ (green_image_info.images | length > 0) | default(false) }}"
     blue_image_available: "{{ (blue_image_info.images | length > 0) | default(false) }}"
+  tags: [fallback, prod_site]
 
 #####################################################################
 # Step 4: Log results
@@ -54,3 +59,4 @@
       - "Latest prod-site tag: {{ latest_prod_site_tag }}"
       - "Green image available: {{ green_image_available }}"
       - "Blue image available:  {{ blue_image_available }}"
+  tags: [fallback, prod_site]
