@@ -1,35 +1,55 @@
 ---
-# Step 3: Pull green/blue images
-- name: Try to pull green image
+# ansible/roles/prod_site/tasks/check_images.yml
+# Pull latest versioned blue/green images from OCIR and check availability
+
+#####################################################################
+# Step 1: Try pulling green image
+#####################################################################
+- name: "Try to pull green image (tag: {{ latest_prod_site_tag }})"
   community.docker.docker_image:
     name: "{{ prod_site_green_image }}"
     source: pull
   register: green_image_check
   failed_when: false
   ignore_errors: true
-  tags: fallback
+  tags:
+    - fallback
 
-- name: Try to pull blue image
+#####################################################################
+# Step 2: Try pulling blue image
+#####################################################################
+- name: "Try to pull blue image (tag: {{ latest_prod_site_tag }})"
   community.docker.docker_image:
     name: "{{ prod_site_blue_image }}"
     source: pull
   register: blue_image_check
   failed_when: false
   ignore_errors: true
-  tags: fallback
+  tags:
+    - fallback
 
-# Step 4: Set image flags
-- name: Set image availability flags
+#####################################################################
+# Step 3: Set image availability flags
+#####################################################################
+- name: Set image availability flags for blue/green
   ansible.builtin.set_fact:
     green_image_available: >-
-      {{ ('Image is up to date' in green_image_check.msg)
-         or ('Downloaded newer image' in green_image_check.msg) }}
+      {{ 'Image is up to date' in green_image_check.msg
+         or 'Downloaded newer image' in green_image_check.msg }}
     blue_image_available: >-
-      {{ ('Image is up to date' in blue_image_check.msg)
-         or ('Downloaded newer image' in blue_image_check.msg) }}
-  tags: fallback
+      {{ 'Image is up to date' in blue_image_check.msg
+         or 'Downloaded newer image' in blue_image_check.msg }}
+  tags:
+    - fallback
 
-- name: Show image availability
+#####################################################################
+# Step 4: Log results
+#####################################################################
+- name: Show image availability results
   ansible.builtin.debug:
-    msg: "Green: {{ green_image_available | default(false) }}, Blue: {{ blue_image_available | default(false) }}"
-  tags: fallback
+    msg:
+      - "Latest prod-site tag: {{ latest_prod_site_tag }}"
+      - "Green image available: {{ green_image_available | default(false) }}"
+      - "Blue image available:  {{ blue_image_available | default(false) }}"
+  tags:
+    - fallback

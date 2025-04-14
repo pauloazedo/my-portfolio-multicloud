@@ -1,0 +1,115 @@
+pipeline {
+  agent any
+
+  environment {
+    CLOUD_PROVIDER      = "${env.CLOUD_PROVIDER ?: 'oci'}"
+    SSH_KEY_PATH        = '/var/jenkins_home/.ssh/id_rsa'
+    ANSIBLE_REMOTE_USER = 'devops'
+    VENV_ACTIVATE       = '/home/jenkins/venv/bin/ansible-playbook'
+    OCIR_NAMESPACE      = 'idtijq8cx4jl'
+    OCIR_REPO           = 'prod-site'
+    OCIR_REGION         = 'iad.ocir.io'
+    OCIR_TAG_LIMIT      = 10
+  }
+
+  options {
+    timestamps()
+    ansiColor('xterm')
+  }
+
+  stages {
+    stage('Checkout') {
+      steps {
+        checkout scm
+      }
+    }
+
+    stage('Fetch OCIR Tags') {
+      steps {
+        withCredentials([usernamePassword(credentialsId: 'ocir-creds', usernameVariable: 'OCIR_USER', passwordVariable: 'OCIR_TOKEN')]) {
+          script {
+            echo "📥 Fetching latest ${env.OCIR_TAG_LIMIT} tags from OCIR..."
+
+            def tags = sh(
+              script: """
+                curl -s -u "$OCIR_USER:$OCIR_TOKEN" \\
+                  https://${env.OCIR_REGION}/v2/${env.OCIR_NAMESPACE}/${env.OCIR_REPO}/tags/list |
+                jq -r '.tags[]' | sort -Vr | head -n ${env.OCIR_TAG_LIMIT}
+              """,
+              returnStdout: true
+            ).trim()
+
+            if (!tags) {
+              error "❌ No tags found in OCIR repository ${env.OCIR_REPO}"
+            }
+
+            env.TAG_CHOICES = tags
+            echo "✅ Available versions:\n${env.TAG_CHOICES}"
+          }
+        }
+      }
+    }
+
+    stage('Select Version to Rollback') {
+      steps {
+        script {
+          def selected = input(
+            id: 'RollbackVersion',
+            message: 'Select the version to rollback to:',
+            parameters: [
+              choice(
+                name: 'ROLLBACK_VERSION',
+                choices: env.TAG_CHOICES.split('\n').join('\n'),
+                description: 'Pick a tag to deploy to GREEN container'
+              )
+            ]
+          )
+          env.ROLLBACK_VERSION = selected
+          echo "🛠️ Selected rollback version: ${env.ROLLBACK_VERSION}"
+        }
+      }
+    }
+
+    stage('Trigger Rollback with Ansible') {
+      steps {
+        withCredentials([file(credentialsId: 'ansible-vault-passfile', variable: 'VAULT_PASS_FILE')]) {
+          sh '''
+            set -e
+            export ANSIBLE_SSH_ARGS="-i ${SSH_KEY_PATH} -o StrictHostKeyChecking=accept-new"
+            export ANSIBLE_REMOTE_USER=${ANSIBLE_REMOTE_USER}
+
+            ${VENV_ACTIVATE} -i ansible/inventory/oci.ini ansible/prod.yml \
+              --limit prod \
+              --tags prod_site_rollback \
+              --extra-vars "rollback_to_version=${ROLLBACK_VERSION}" \
+              --vault-password-file "${VAULT_PASS_FILE}"
+          '''
+        }
+      }
+    }
+  }
+
+  post {
+    success {
+      script {
+        slackSend (
+          channel: '#jenkins_notifications',
+          color: 'warning',
+          message: """🟠 *Rollback Completed*
+• Version: \`${env.ROLLBACK_VERSION}\`
+• Triggered by: *${currentBuild.rawBuild.getCause(hudson.model.Cause$UserIdCause)?.userName ?: 'unknown'}*
+• 🔗 <${env.BUILD_URL}|View Rollback Build>"""
+        )
+      }
+    }
+    failure {
+      script {
+        slackSend (
+          channel: '#jenkins_notifications',
+          color: 'danger',
+          message: "❌ *Rollback FAILED* for version `${env.ROLLBACK_VERSION}`.\n🔗 <${env.BUILD_URL}|View Jenkins Build>"
+        )
+      }
+    }
+  }
+}

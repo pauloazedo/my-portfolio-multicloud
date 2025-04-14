@@ -1,0 +1,50 @@
+---
+# ansible/roles/prod_site/tasks/rollback.yml
+# Rollback the green container to the last known good version
+
+#####################################################################
+# Step 1: Read last promoted version tag from file
+#####################################################################
+- name: Read last promoted version tag
+  ansible.builtin.slurp:
+    src: "/home/devops/last-promoted-green.txt"
+  register: rollback_tag_raw
+  ignore_errors: false
+
+- name: Decode and set rollback image tag
+  ansible.builtin.set_fact:
+    rollback_version_tag: "{{ rollback_tag_raw['content'] | b64decode | trim }}"
+    rollback_image: "iad.ocir.io/{{ ocir_namespace }}/prod-site:{{ rollback_version_tag }}"
+
+- name: Show rollback version being restored
+  ansible.builtin.debug:
+    msg: "Rolling back green container to version: {{ rollback_version_tag }}"
+
+#####################################################################
+# Step 2: Remove current green container
+#####################################################################
+- name: Remove current green container
+  community.docker.docker_container:
+    name: "{{ prod_site_green_container }}"
+    state: absent
+    force_kill: true
+  register: green_cleanup
+  ignore_errors: true
+
+- name: Log cleanup result
+  ansible.builtin.debug:
+    msg: "Removed current green container: {{ green_cleanup.changed }}"
+
+#####################################################################
+# Step 3: Start green container with rollback version
+#####################################################################
+- name: Run green container with rollback image
+  community.docker.docker_container:
+    name: "{{ prod_site_green_container }}"
+    image: "{{ rollback_image }}"
+    restart_policy: always
+    published_ports:
+      - "{{ prod_site_green_port }}:3000"
+    recreate: true
+    state: started
+  tags: rollback
