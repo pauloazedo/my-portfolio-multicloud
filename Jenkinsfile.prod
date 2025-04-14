@@ -1,3 +1,5 @@
+// Jenkinsfile.prod
+
 pipeline {
   agent any
 
@@ -78,7 +80,7 @@ pipeline {
 
             ${VENV_ACTIVATE} -i ${ANSIBLE_INVENTORY} ansible/prod.yml \
               --limit prod \
-              --tags prod_site \
+              --tags "prod_site,fallback" \
               --extra-vars "prod_site_target=blue" \
               --vault-password-file "${VAULT_PASS_FILE}"
           '''
@@ -109,7 +111,7 @@ pipeline {
 
             ${VENV_ACTIVATE} -i ${ANSIBLE_INVENTORY} ansible/prod.yml \
               --limit prod \
-              --tags prod_site \
+              --tags "prod_site,fallback" \
               --extra-vars "prod_site_target=green" \
               --vault-password-file "${VAULT_PASS_FILE}"
           '''
