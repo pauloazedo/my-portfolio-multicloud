@@ -78,7 +78,7 @@ pipeline {
 
             ${VENV_ACTIVATE} -i ${ANSIBLE_INVENTORY} ansible/prod.yml \
               --limit prod \
-              --tags prod_site_blue \
+              --tags prod_site \
               --extra-vars "prod_site_target=blue" \
               --vault-password-file "${VAULT_PASS_FILE}"
           '''
@@ -109,7 +109,7 @@ pipeline {
 
             ${VENV_ACTIVATE} -i ${ANSIBLE_INVENTORY} ansible/prod.yml \
               --limit prod \
-              --tags prod_site_green \
+              --tags prod_site \
               --extra-vars "prod_site_target=green" \
               --vault-password-file "${VAULT_PASS_FILE}"
           '''

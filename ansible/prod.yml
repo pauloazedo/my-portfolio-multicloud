@@ -12,7 +12,7 @@
     - group_vars/{{ cloud_provider }}/{{ cloud_provider }}.yml
     - group_vars/{{ cloud_provider }}/{{ cloud_provider }}.secrets.yml
 
-  # Default target is both (can be overridden by CLI extra-vars or Jenkins tags)
+  # Default target is 'both', can be overridden via --extra-vars
   vars:
     prod_site_target: "both"
 
@@ -55,29 +55,10 @@
       tags: set_ssh_access
 
     ############################################################
-    # Step 2: Deployment (controlled by tags)
+    # Step 2: Deployment (target decided by prod_site_target)
     ############################################################
 
-    - name: Deploy only to BLUE container
+    - name: Deploy PROD container(s) based on prod_site_target
       ansible.builtin.include_role:
         name: prod_site
-      vars:
-        prod_site_target: "blue"
-      when: "'prod_site_blue' in ansible_run_tags"
-      tags: prod_site_blue
-
-    - name: Deploy only to GREEN container
-      ansible.builtin.include_role:
-        name: prod_site
-      vars:
-        prod_site_target: "green"
-      when: "'prod_site_green' in ansible_run_tags"
-      tags: prod_site_green
-
-    - name: Deploy to BOTH containers
-      ansible.builtin.include_role:
-        name: prod_site
-      vars:
-        prod_site_target: "both"
-      when: "'prod_site' in ansible_run_tags"
       tags: prod_site
