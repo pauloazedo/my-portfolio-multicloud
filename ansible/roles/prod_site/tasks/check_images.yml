@@ -42,8 +42,8 @@
 
 - name: Set image availability flags for blue/green
   ansible.builtin.set_fact:
-    green_image_available: "{{ green_image_info.images | length > 0 }}"
-    blue_image_available: "{{ blue_image_info.images | length > 0 }}"
+    green_image_available: "{{ (green_image_info.images | length > 0) | default(false) }}"
+    blue_image_available: "{{ (blue_image_info.images | length > 0) | default(false) }}"
 
 #####################################################################
 # Step 4: Log results

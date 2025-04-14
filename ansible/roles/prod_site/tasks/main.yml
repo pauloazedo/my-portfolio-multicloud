@@ -44,8 +44,8 @@
 - name: Set latest tag and define image references
   ansible.builtin.set_fact:
     latest_prod_site_tag: "{{ latest_tag_result.stdout }}"
-    prod_site_blue_image: "iad.ocir.io/{{ ocir_namespace }}/prod-site:{{ latest_tag_result.stdout }}"
-    prod_site_green_image: "iad.ocir.io/{{ ocir_namespace }}/prod-site:{{ latest_tag_result.stdout }}"
+    prod_site_blue_image: "iad.ocir.io/{{ ocir_namespace }}/prod-site:{{ latest_prod_site_tag }}"
+    prod_site_green_image: "iad.ocir.io/{{ ocir_namespace }}/prod-site:{{ latest_prod_site_tag }}"
 
 - name: Show tag being deployed
   ansible.builtin.debug:
@@ -64,8 +64,8 @@
 - name: Build and push fallback image
   ansible.builtin.include_tasks: run-fallback.yml
   when:
-    - force_fallback | bool
-    - not (blue_image_available | bool) and not (green_image_available | bool)
+    - force_fallback | default(false)
+    - not (blue_image_available | default(false)) and not (green_image_available | default(false))
   tags:
     - fallback
     - force-fallback
@@ -88,14 +88,14 @@
   ansible.builtin.include_tasks: cleanup-blue.yml
   when:
     - prod_site_target in ["both", "blue"]
-    - not (blue_image_available | bool) and not (green_image_available | bool)
+    - not (blue_image_available | default(false)) and not (green_image_available | default(false))
   tags: fallback
 
 - name: Cleanup fallback for green
   ansible.builtin.include_tasks: cleanup-green.yml
   when:
     - prod_site_target in ["both", "green"]
-    - not (blue_image_available | bool) and not (green_image_available | bool)
+    - not (blue_image_available | default(false)) and not (green_image_available | default(false))
   tags: fallback
 
 #####################################################################
