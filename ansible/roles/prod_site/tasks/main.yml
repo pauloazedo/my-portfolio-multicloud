@@ -29,47 +29,12 @@
   changed_when: false
 
 #####################################################################
-# Step 3: Discover the latest prod-site image tag from OCIR
+# Step 3: Discover the latest prod-site image tag from OCIR (via Jenkins)
 #####################################################################
-- name: Try to fetch latest prod-site tag from OCIR
-  ansible.builtin.shell: |
-    set -o pipefail
-    curl -s -H "Authorization: Bearer {{ ocir_token }}" \
-      https://iad.ocir.io/v2/{{ ocir_namespace }}/{{ prod_site_ocir_repo | regex_replace('^.*?/', '') }}/tags/list |
-    jq -r 'select(.tags != null) | .tags | sort | reverse | .[0]'
-  register: latest_tag_result
-  changed_when: false
-  failed_when: false
+- name: Discover latest tag from OCIR using Jenkins container
+  ansible.builtin.include_tasks: query-latest-tag.yml
   when: not force_fallback | default(false)
-
-# 🐛 Debug raw tag result
-- name: DEBUG raw latest_tag_result
-  ansible.builtin.debug:
-    var: latest_tag_result
-
-# 🧪 Debug the parsed value (what will be used)
-- name: DEBUG parsed tag from latest_tag_result.stdout
-  ansible.builtin.debug:
-    msg: "Discovered latest tag is: {{ latest_tag_result.stdout | default('UNSET') }}"
-
-# 🧾 Optional: Save it on disk for inspection if needed
-- name: Write discovered tag to /tmp/latest_tag_debug.txt
-  ansible.builtin.copy:
-    content: "{{ latest_tag_result.stdout | default('') }}"
-    dest: /tmp/latest_tag_debug.txt
-    mode: '0644'
-
-- name: Set latest tag and define image references
-  ansible.builtin.set_fact:
-    latest_prod_site_tag: "{{ latest_tag_result.stdout | default('') }}"
-    prod_site_blue_image: "{{ prod_site_ocir_repo }}:{{ latest_tag_result.stdout }}"
-    prod_site_green_image: "{{ prod_site_ocir_repo }}:{{ latest_tag_result.stdout }}"
-  when: (latest_tag_result is defined) and ((latest_tag_result.stdout | default('')) != "")
-
-- name: Show tag being deployed
-  ansible.builtin.debug:
-    msg: "Deploying prod-site version {{ latest_prod_site_tag }}"
-  when: (latest_tag_result is defined) and ((latest_tag_result.stdout | default('')) != "")
+  tags: prod_site
 
 #####################################################################
 # Step 4: Check image availability
@@ -78,8 +43,8 @@
   ansible.builtin.include_tasks: check_images.yml
   when:
     - not (force_fallback | default(false))
-    - latest_tag_result is defined
-    - (latest_tag_result.stdout | default('')) != ""
+    - latest_prod_site_tag is defined
+    - (latest_prod_site_tag | default('')) != ""
   tags: [fallback, prod_site]
 
 #####################################################################
@@ -89,7 +54,7 @@
   ansible.builtin.include_tasks: run-fallback.yml
   when:
     - force_fallback | default(false)
-      or (latest_tag_result is defined and (latest_tag_result.stdout | default('')) == "")
+      or (latest_prod_site_tag is not defined or (latest_prod_site_tag | default('')) == "")
   tags:
     - fallback
 
@@ -100,16 +65,16 @@
   ansible.builtin.include_tasks: run-blue.yml
   when:
     - not (force_fallback | default(false))
-    - latest_tag_result is defined
-    - (latest_tag_result.stdout | default('')) != ""
+    - latest_prod_site_tag is defined
+    - (latest_prod_site_tag | default('')) != ""
     - prod_site_target in ["both", "blue"]
 
 - name: Deploy green container
   ansible.builtin.include_tasks: run-green.yml
   when:
     - not (force_fallback | default(false))
-    - latest_tag_result is defined
-    - (latest_tag_result.stdout | default('')) != ""
+    - latest_prod_site_tag is defined
+    - (latest_prod_site_tag | default('')) != ""
     - prod_site_target in ["both", "green"]
 
 #####################################################################
@@ -119,8 +84,8 @@
   ansible.builtin.include_tasks: cleanup-blue.yml
   when:
     - not (force_fallback | default(false))
-    - latest_tag_result is defined
-    - (latest_tag_result.stdout | default('')) != ""
+    - latest_prod_site_tag is defined
+    - (latest_prod_site_tag | default('')) != ""
     - prod_site_target in ["both", "blue"]
     - not (blue_image_available | default(false)) and not (green_image_available | default(false))
   tags: fallback
@@ -129,8 +94,8 @@
   ansible.builtin.include_tasks: cleanup-green.yml
   when:
     - not (force_fallback | default(false))
-    - latest_tag_result is defined
-    - (latest_tag_result.stdout | default('')) != ""
+    - latest_prod_site_tag is defined
+    - (latest_prod_site_tag | default('')) != ""
     - prod_site_target in ["both", "green"]
     - not (blue_image_available | default(false)) and not (green_image_available | default(false))
   tags: fallback
