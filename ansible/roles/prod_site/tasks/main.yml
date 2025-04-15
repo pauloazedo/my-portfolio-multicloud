@@ -42,6 +42,23 @@
   failed_when: false
   when: not force_fallback | default(false)
 
+# 🐛 Debug raw tag result
+- name: DEBUG raw latest_tag_result
+  ansible.builtin.debug:
+    var: latest_tag_result
+
+# 🧪 Debug the parsed value (what will be used)
+- name: DEBUG parsed tag from latest_tag_result.stdout
+  ansible.builtin.debug:
+    msg: "Discovered latest tag is: {{ latest_tag_result.stdout | default('UNSET') }}"
+
+# 🧾 Optional: Save it on disk for inspection if needed
+- name: Write discovered tag to /tmp/latest_tag_debug.txt
+  ansible.builtin.copy:
+    content: "{{ latest_tag_result.stdout | default('') }}"
+    dest: /tmp/latest_tag_debug.txt
+    mode: '0644'
+
 - name: Set latest tag and define image references
   ansible.builtin.set_fact:
     latest_prod_site_tag: "{{ latest_tag_result.stdout | default('') }}"
