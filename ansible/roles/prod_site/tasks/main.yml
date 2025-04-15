@@ -6,7 +6,7 @@
 #####################################################################
 - name: Ensure Docker is installed
   ansible.builtin.include_role:
-    name: docker
+    name: "{{ docker_role | default('docker') }}"
   tags: always
 
 #####################################################################
@@ -38,6 +38,7 @@
   when:
     - latest_prod_site_tag is defined
     - latest_prod_site_tag | length > 0
+  tags: always
 
 #####################################################################
 # Step 4: Check image availability
@@ -58,8 +59,7 @@
   when:
     - force_fallback | default(false)
       or (latest_prod_site_tag is not defined or latest_prod_site_tag | length == 0)
-  tags:
-    - fallback
+  tags: [fallback]
 
 #####################################################################
 # Step 6: Deploy blue and green containers
@@ -71,6 +71,7 @@
     - latest_prod_site_tag is defined
     - latest_prod_site_tag | length > 0
     - prod_site_target in ["both", "blue"]
+  tags: prod_site
 
 - name: Deploy green container
   ansible.builtin.include_tasks: run-green.yml
@@ -79,6 +80,7 @@
     - latest_prod_site_tag is defined
     - latest_prod_site_tag | length > 0
     - prod_site_target in ["both", "green"]
+  tags: prod_site
 
 #####################################################################
 # Step 7: Cleanup fallback artifacts
