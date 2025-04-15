@@ -1,11 +1,17 @@
 # ansible/roles/uat_site/tasks/image.yml
 ---
 
-- name: Build and tag UAT Docker image (on UAT server)
+- name: Build and push UAT Docker image (multi-cloud compatible)
   community.docker.docker_image:
-    name: "{{ uat_site_ocir_repo }}"
-    tag: "{{ uat_site_image_tag }}"
+    name: "{{ uat_site_image }}"
     build:
       path: "/home/devops/frontend"
     source: build
     push: true
+  register: uat_image_build_result
+  tags: [uat_site, build]
+
+- name: Log image build result
+  ansible.builtin.debug:
+    var: uat_image_build_result
+  tags: [uat_site, build]
