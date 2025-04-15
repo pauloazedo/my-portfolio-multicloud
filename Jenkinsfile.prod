@@ -55,7 +55,7 @@ pipeline {
     stage('Discover Latest Tag from OCIR') {
       steps {
         withCredentials([usernamePassword(
-          credentialsId: 'ocir-jenkins',
+          credentialsId: 'ocir-creds',
           usernameVariable: 'OCIR_USERNAME',
           passwordVariable: 'OCIR_PASSWORD'
         )]) {
