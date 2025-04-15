@@ -1,5 +1,5 @@
 # ansible/roles/prod_site/files/prod-waiting.Dockerfile
-FROM nginx:alpine
+FROM nginx:stable-alpine
 
 # Use shared fallback NGINX config
 COPY default-waiting.conf /etc/nginx/conf.d/default.conf
