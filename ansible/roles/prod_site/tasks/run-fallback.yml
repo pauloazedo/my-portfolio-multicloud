@@ -1,6 +1,9 @@
 # ansible/roles/prod_site/tasks/run-fallback.yml
-# Build and deploy dynamic fallback PROD image to OCIR, used by both blue and green containers.
+# Build and deploy dynamic fallback PROD image used by both blue and green containers.
 
+#####################################################################
+# Step 1: Log fallback conditions
+#####################################################################
 - name: Show fallback condition debug
   ansible.builtin.debug:
     msg: >
@@ -9,6 +12,9 @@
       force_fallback={{ force_fallback | default(false) }}
   tags: fallback
 
+#####################################################################
+# Step 2: Copy fallback build files
+#####################################################################
 - name: Copy fallback Dockerfile
   ansible.builtin.copy:
     src: files/prod-waiting.Dockerfile
@@ -36,6 +42,9 @@
     mode: '0644'
   tags: fallback
 
+#####################################################################
+# Step 3: Build and push fallback image (if registry is defined)
+#####################################################################
 - name: Build fallback PROD image
   community.docker.docker_image:
     name: prod-waiting
@@ -57,46 +66,55 @@
     msg: "Built fallback PROD image: {{ fallback_build_result.image }}"
   tags: fallback
 
-- name: Tag fallback image for OCIR
+- name: Tag fallback image for registry
   ansible.builtin.command:
     cmd: docker tag prod-waiting:latest {{ prod_site_waiting_image }}
   changed_when: true
+  when: prod_site_waiting_image is defined
   tags: fallback
 
-- name: Push fallback image to OCIR
+- name: Push fallback image to registry
   ansible.builtin.command:
     cmd: docker push {{ prod_site_waiting_image }}
   changed_when: true
   register: fallback_push_result
+  when: prod_site_waiting_image is defined
   tags: fallback
 
 - name: Log fallback image push result
   ansible.builtin.debug:
-    msg: "Pushed fallback image to OCIR: {{ fallback_push_result.stdout_lines | default([]) }}"
+    msg: "Pushed fallback image to registry: {{ fallback_push_result.stdout_lines | default([]) }}"
+  when: prod_site_waiting_image is defined
   tags: fallback
 
+#####################################################################
+# Step 4: Remove existing fallback containers
+#####################################################################
 - name: Stop and remove existing blue fallback container
   community.docker.docker_container:
-    name: prod_site_blue
+    name: "{{ prod_site_blue_container }}"
     state: absent
     force_kill: true
   tags: fallback
 
 - name: Stop and remove existing green fallback container
   community.docker.docker_container:
-    name: prod_site_green
+    name: "{{ prod_site_green_container }}"
     state: absent
     force_kill: true
   tags: fallback
 
+#####################################################################
+# Step 5: Run fallback containers
+#####################################################################
 - name: Run fallback blue container
   community.docker.docker_container:
-    name: prod_site_blue
+    name: "{{ prod_site_blue_container }}"
     image: "{{ prod_site_waiting_image }}"
     state: started
     restart_policy: unless-stopped
     published_ports:
-      - "3200:3000"
+      - "{{ prod_site_blue_port }}:3000"
     env:
       FALLBACK_LABEL: "BLUE"
       FALLBACK_COLOR: "blue"
@@ -111,12 +129,12 @@
 
 - name: Run fallback green container
   community.docker.docker_container:
-    name: prod_site_green
+    name: "{{ prod_site_green_container }}"
     image: "{{ prod_site_waiting_image }}"
     state: started
     restart_policy: unless-stopped
     published_ports:
-      - "3100:3000"
+      - "{{ prod_site_green_port }}:3000"
     env:
       FALLBACK_LABEL: "GREEN"
       FALLBACK_COLOR: "green"

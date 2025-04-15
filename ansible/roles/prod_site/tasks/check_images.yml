@@ -1,5 +1,5 @@
 # ansible/roles/prod_site/tasks/check_images.yml
-# Pull latest versioned blue/green images from OCIR and check availability
+# Pull latest versioned blue/green images and check availability (multi-cloud)
 
 #####################################################################
 # Step 1: Try pulling green image

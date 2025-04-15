@@ -10,55 +10,66 @@
   tags: always
 
 #####################################################################
-# Step 2: Authenticate with OCIR (Oracle Container Registry)
+# Step 2: Authenticate with Container Registry (Multi-Cloud)
 #####################################################################
-- name: Check if already logged into OCIR
+- name: Check if already logged into registry
   ansible.builtin.command: docker info
   register: docker_info_check
   changed_when: false
   failed_when: false
 
-- name: Login to OCIR (if not already logged in)
+- name: Login to container registry (if not already logged in)
   ansible.builtin.command:
     cmd: >
-      docker login iad.ocir.io
-      -u {{ ocir_user }}
-      -p {{ ocir_token }}
-  when: docker_info_check.stdout is not search('iad.ocir.io')
+      docker login {{ container_registry_url }}
+      -u {{ container_registry_user }}
+      -p {{ container_registry_token }}
+  when: docker_info_check.stdout is not search(container_registry_url)
   no_log: true
   changed_when: false
 
 #####################################################################
-# Step 3: Check image availability
+# Step 3: Set image references for blue/green containers
+#####################################################################
+- name: Set image references for blue/green containers
+  ansible.builtin.set_fact:
+    prod_site_blue_image: "{{ prod_site_image_repo }}:{{ latest_prod_site_tag }}"
+    prod_site_green_image: "{{ prod_site_image_repo }}:{{ latest_prod_site_tag }}"
+  when:
+    - latest_prod_site_tag is defined
+    - latest_prod_site_tag | length > 0
+
+#####################################################################
+# Step 4: Check image availability
 #####################################################################
 - name: Check availability of versioned images
   ansible.builtin.include_tasks: check_images.yml
   when:
     - not (force_fallback | default(false))
     - latest_prod_site_tag is defined
-    - (latest_prod_site_tag | default('')) != ""
+    - latest_prod_site_tag | length > 0
   tags: [fallback, prod_site]
 
 #####################################################################
-# Step 4: Run fallback logic if no tags were found or forced
+# Step 5: Run fallback logic if no tags were found or forced
 #####################################################################
 - name: Skip blue/green deploy and run fallback if no image is available
   ansible.builtin.include_tasks: run-fallback.yml
   when:
     - force_fallback | default(false)
-      or (latest_prod_site_tag is not defined or (latest_prod_site_tag | default('')) == "")
+      or (latest_prod_site_tag is not defined or latest_prod_site_tag | length == 0)
   tags:
     - fallback
 
 #####################################################################
-# Step 5: Deploy blue and green containers
+# Step 6: Deploy blue and green containers
 #####################################################################
 - name: Deploy blue container
   ansible.builtin.include_tasks: run-blue.yml
   when:
     - not (force_fallback | default(false))
     - latest_prod_site_tag is defined
-    - (latest_prod_site_tag | default('')) != ""
+    - latest_prod_site_tag | length > 0
     - prod_site_target in ["both", "blue"]
 
 - name: Deploy green container
@@ -66,18 +77,18 @@
   when:
     - not (force_fallback | default(false))
     - latest_prod_site_tag is defined
-    - (latest_prod_site_tag | default('')) != ""
+    - latest_prod_site_tag | length > 0
     - prod_site_target in ["both", "green"]
 
 #####################################################################
-# Step 6: Cleanup fallback artifacts
+# Step 7: Cleanup fallback artifacts
 #####################################################################
 - name: Cleanup fallback for blue
   ansible.builtin.include_tasks: cleanup-blue.yml
   when:
     - not (force_fallback | default(false))
     - latest_prod_site_tag is defined
-    - (latest_prod_site_tag | default('')) != ""
+    - latest_prod_site_tag | length > 0
     - prod_site_target in ["both", "blue"]
     - not (blue_image_available | default(false)) and not (green_image_available | default(false))
   tags: fallback
@@ -87,13 +98,13 @@
   when:
     - not (force_fallback | default(false))
     - latest_prod_site_tag is defined
-    - (latest_prod_site_tag | default('')) != ""
+    - latest_prod_site_tag | length > 0
     - prod_site_target in ["both", "green"]
     - not (blue_image_available | default(false)) and not (green_image_available | default(false))
   tags: fallback
 
 #####################################################################
-# Step 7: Final Docker system cleanup
+# Step 8: Final Docker system cleanup
 #####################################################################
 - name: Final Docker cleanup
   ansible.builtin.import_tasks: docker-prune.yml

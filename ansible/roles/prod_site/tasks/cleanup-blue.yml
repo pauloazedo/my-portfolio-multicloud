@@ -1,38 +1,51 @@
 # ansible/roles/prod_site/tasks/cleanup-blue.yml
+# Cleanup fallback artifacts after successful blue deployment
 
+#####################################################################
+# Step 1: Remove fallback-specific artifacts
+#####################################################################
 - name: Remove fallback HTML page for blue
   ansible.builtin.file:
     path: "/home/devops/prod-fallback-blue.html"
     state: absent
+  tags: cleanup
 
 - name: Remove copied fallback index.html
   ansible.builtin.file:
     path: /home/devops/index.html
     state: absent
+  tags: cleanup
 
 - name: Remove prod-waiting.Dockerfile
   ansible.builtin.file:
     path: /home/devops/prod-waiting.Dockerfile
     state: absent
+  tags: cleanup
 
 - name: Remove default-waiting.conf
   ansible.builtin.file:
     path: /home/devops/default-waiting.conf
     state: absent
+  tags: cleanup
 
+#####################################################################
+# Step 2: Clean up untagged fallback Docker images (blue)
+#####################################################################
 - name: Remove untagged fallback Docker images (blue)
   ansible.builtin.shell: |
     set -o pipefail
     docker images --filter=reference='prod-waiting' \
-      --format '{{ '{{' }}.Repository{{ '}}' }}:{{ '{{' }}.Tag{{ '}}' }} {{ '{{' }}.ID{{ '}}' }}' |
+      --format '{{ "{{" }}.Repository{{ "}}" }}:{{ "{{" }}.Tag{{ "}}" }} {{ "{{" }}.ID{{ "}}" }}' |
     grep -v 'prod-waiting:latest' | awk '{print $2}' | xargs -r docker rmi
   args:
     executable: /bin/bash
   register: blue_cleanup_result
   changed_when: blue_cleanup_result.stdout != ""
   failed_when: false
+  tags: cleanup
 
 - name: Show fallback cleanup result (blue)
   ansible.builtin.debug:
     msg: "{{ blue_cleanup_result.stdout_lines | default([]) }}"
   when: blue_cleanup_result.stdout_lines is defined
+  tags: cleanup

@@ -1,5 +1,6 @@
 ---
-# UAT Site Deployment Entry Point
+# ansible/roles/uat_site/tasks/main.yml
+# UAT Site Deployment Entry Point (Multi-Cloud Compatible)
 
 ############################################################
 # Step 1: Ensure Docker is installed
@@ -10,22 +11,22 @@
   tags: uat_site
 
 ############################################################
-# Step 2: Authenticate with OCIR (only if needed)
+# Step 2: Authenticate with Container Registry (multi-cloud)
 ############################################################
-- name: Check if already logged into OCIR
+- name: Check if already logged into registry
   ansible.builtin.command: docker info
   register: docker_info_check
   changed_when: false
   failed_when: false
   tags: uat_site
 
-- name: Authenticate with OCIR
+- name: Authenticate with container registry
   ansible.builtin.command:
     cmd: >
-      docker login iad.ocir.io
-      -u {{ ocir_user }}
-      -p {{ ocir_token }}
-  when: docker_info_check.stdout is not search('iad.ocir.io')
+      docker login {{ container_registry_url }}
+      -u {{ container_registry_user }}
+      -p {{ container_registry_token }}
+  when: docker_info_check.stdout is not search(container_registry_url)
   no_log: true
   changed_when: false
   tags: uat_site
@@ -49,9 +50,9 @@
   tags: uat_site
 
 ############################################################
-# Step 5: Pull image from OCIR and check availability
+# Step 5: Pull image from registry and check availability
 ############################################################
-- name: Pull UAT site image from OCIR
+- name: Pull UAT site image from registry
   community.docker.docker_image:
     name: "{{ uat_site_image }}"
     source: pull
