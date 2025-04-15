@@ -44,7 +44,7 @@
     - jenkins_container
 
 #####################################################################
-# Step 3: Include Jenkins tool install logic
+# Step 3: Include Jenkins tool installation logic
 #####################################################################
 - name: Include Jenkins tool installation logic
   ansible.builtin.include_tasks: tools.yml
@@ -53,7 +53,27 @@
     - jenkins_tools
 
 #####################################################################
-# Step 4: Include Jenkins workspace cleanup logic
+# Step 4: Install skopeo and jq inside Jenkins container
+#####################################################################
+- name: Ensure skopeo and jq are installed in Jenkins container
+  community.docker.docker_container_exec:
+    container: "{{ jenkins_container_name }}"
+    user: root
+    command: >
+      bash -c '
+        set -e
+        apt-get update &&
+        apt-get install -y skopeo jq
+      '
+  register: jenkins_skopeo_install
+  changed_when: jenkins_skopeo_install.rc == 0
+  tags:
+    - jenkins
+    - jenkins_tools
+    - jenkins_ocir
+
+#####################################################################
+# Step 5: Include Jenkins workspace cleanup logic
 #####################################################################
 - name: Include Jenkins workspace cleanup logic
   ansible.builtin.include_tasks: cleanup-workspace.yml
@@ -62,7 +82,7 @@
     - jenkins_cleanup
 
 #####################################################################
-# Step 5: Create ssh keys and add fingerprints
+# Step 6: Create SSH Keys and add fingerprints
 #####################################################################
 - name: Create SSH Keys and add fingerprints
   ansible.builtin.include_tasks: ssh-access.yml

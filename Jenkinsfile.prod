@@ -53,7 +53,7 @@ pipeline {
       }
     }
 
-    stage('Deploy to BLUE Container') {
+    stage('Deploy Latest Tag to BLUE Container') {
       steps {
         withCredentials([file(credentialsId: 'ansible-vault-passfile', variable: 'VAULT_PASS_FILE')]) {
           sh '''
@@ -79,7 +79,7 @@ pipeline {
       }
     }
 
-    stage('Promote BLUE to GREEN') {
+    stage('Promote BLUE to GREEN Container') {
       steps {
         withCredentials([file(credentialsId: 'ansible-vault-passfile', variable: 'VAULT_PASS_FILE')]) {
           sh '''
