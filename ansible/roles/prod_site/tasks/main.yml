@@ -29,15 +29,7 @@
   changed_when: false
 
 #####################################################################
-# Step 3: Discover the latest prod-site image tag from OCIR (via Jenkins)
-#####################################################################
-- name: Discover latest tag from OCIR using Jenkins container
-  ansible.builtin.include_tasks: query-latest-tag.yml
-  when: not force_fallback | default(false)
-  tags: prod_site
-
-#####################################################################
-# Step 4: Check image availability
+# Step 3: Check image availability
 #####################################################################
 - name: Check availability of versioned images
   ansible.builtin.include_tasks: check_images.yml
@@ -48,7 +40,7 @@
   tags: [fallback, prod_site]
 
 #####################################################################
-# Step 5: Run fallback logic if no tags were found or forced
+# Step 4: Run fallback logic if no tags were found or forced
 #####################################################################
 - name: Skip blue/green deploy and run fallback if no image is available
   ansible.builtin.include_tasks: run-fallback.yml
@@ -59,7 +51,7 @@
     - fallback
 
 #####################################################################
-# Step 6: Deploy blue and green containers
+# Step 5: Deploy blue and green containers
 #####################################################################
 - name: Deploy blue container
   ansible.builtin.include_tasks: run-blue.yml
@@ -78,7 +70,7 @@
     - prod_site_target in ["both", "green"]
 
 #####################################################################
-# Step 7: Cleanup fallback artifacts
+# Step 6: Cleanup fallback artifacts
 #####################################################################
 - name: Cleanup fallback for blue
   ansible.builtin.include_tasks: cleanup-blue.yml
@@ -101,7 +93,7 @@
   tags: fallback
 
 #####################################################################
-# Step 8: Final Docker system cleanup
+# Step 7: Final Docker system cleanup
 #####################################################################
 - name: Final Docker cleanup
   ansible.builtin.import_tasks: docker-prune.yml
