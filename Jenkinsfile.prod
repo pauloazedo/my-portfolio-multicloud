@@ -94,6 +94,18 @@ pipeline {
               --vault-password-file "${VAULT_PASS_FILE}"
           '''
         }
+
+        script {
+          slackSend (
+            channel: '#jenkins_notifications',
+            color: '#439FE0',
+            message: """🔵 *Deployed to BLUE container*
+• Version: *${env.LATEST_PROD_TAG}*
+• Environment: *${env.CLOUD_PROVIDER.toUpperCase()}*
+• 🔗 <${env.BUILD_URL}|View Jenkins Build>
+• 🔁 Awaiting manual approval to promote to GREEN..."""
+          )
+        }
       }
     }
 
@@ -101,6 +113,25 @@ pipeline {
       steps {
         timeout(time: 2, unit: 'HOURS') {
           input message: "Promote BLUE container to GREEN?", ok: "Approve"
+        }
+      }
+      post {
+        aborted {
+          script {
+            def currentGreenVersion = sh(
+              script: "ssh -o StrictHostKeyChecking=accept-new -i ${SSH_KEY_PATH} ${ANSIBLE_REMOTE_USER}@${ANSIBLE_TARGET_HOST} 'docker inspect --format={{.Config.Image}} prod-site-green || echo unknown'",
+              returnStdout: true
+            ).trim()
+
+            slackSend (
+              channel: '#jenkins_notifications',
+              color: 'warning',
+              message: """⚠️ *Approval aborted*
+• Attempted Version: *${env.LATEST_PROD_TAG}*
+• Current GREEN version still running: *${currentGreenVersion}*
+• 🔗 <${env.BUILD_URL}|View Jenkins Build>"""
+            )
+          }
         }
       }
     }
@@ -120,6 +151,18 @@ pipeline {
               --vault-password-file "${VAULT_PASS_FILE}"
           '''
         }
+
+        script {
+          slackSend (
+            channel: '#jenkins_notifications',
+            color: 'good',
+            message: """✅ *Promoted to GREEN container*
+• Version: *${env.LATEST_PROD_TAG}*
+• Environment: *${env.CLOUD_PROVIDER.toUpperCase()}*
+• 🔗 <${env.BUILD_URL}|View Jenkins Build>
+• 🌐 <${env.PROD_APP_URL}|Open Live App>"""
+          )
+        }
       }
     }
   }
@@ -130,7 +173,8 @@ pipeline {
         slackSend (
           channel: '#jenkins_notifications',
           color: 'good',
-          message: """🟢 *PROD Deployment Completed!*
+          message: """🎉 *PROD Deployment Completed Successfully*
+• Version: *${env.LATEST_PROD_TAG}*
 • Environment: *${env.CLOUD_PROVIDER.toUpperCase()}*
 • 🔗 <${env.BUILD_URL}|View Jenkins Build>
 • 🌐 <${env.PROD_APP_URL}|Open Live App>"""
@@ -143,7 +187,9 @@ pipeline {
         slackSend (
           channel: '#jenkins_notifications',
           color: 'danger',
-          message: "❌ *PROD Pipeline FAILED*.\n🔗 <${env.BUILD_URL}|View Jenkins Build>"
+          message: """❌ *PROD Pipeline FAILED*
+• Environment: *${env.CLOUD_PROVIDER.toUpperCase()}*
+• 🔗 <${env.BUILD_URL}|View Jenkins Build>"""
         )
       }
     }

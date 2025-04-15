@@ -32,7 +32,23 @@
   tags: uat_site
 
 ############################################################
-# Step 3: Build and push image (only if tag is defined)
+# Step 3: Render dynamic .env.production file
+############################################################
+- name: Render .env.production with version and cloud provider
+  ansible.builtin.template:
+    src: env.production.j2
+    dest: "{{ frontend_source_dir }}/.env.production"
+    owner: devops
+    group: devops
+    mode: '0644'
+  vars:
+    frontend_source_dir: "/home/devops/frontend"
+    latest_tag: "{{ uat_site_image_tag | default('unknown') }}"
+  when: uat_site_image_tag is defined
+  tags: uat_site
+
+############################################################
+# Step 4: Build and push image (only if tag is defined)
 ############################################################
 - name: Build and push UAT site Docker image
   ansible.builtin.import_tasks: image.yml
@@ -40,7 +56,7 @@
   tags: uat_site
 
 ############################################################
-# Step 4: Stop and remove previous container
+# Step 5: Stop and remove previous container
 ############################################################
 - name: Stop and remove existing UAT site container
   community.docker.docker_container:
@@ -50,7 +66,7 @@
   tags: uat_site
 
 ############################################################
-# Step 5: Pull image from registry and check availability
+# Step 6: Pull image from registry and check availability
 ############################################################
 - name: Pull UAT site image from registry
   community.docker.docker_image:
@@ -80,7 +96,7 @@
   tags: uat_site
 
 ############################################################
-# Step 6: Fallback Preparation (if image is not available)
+# Step 7: Fallback Preparation (if image is not available)
 ############################################################
 - name: Fallback setup block
   when: not uat_image_available | default(false)
@@ -133,7 +149,7 @@
         mode: '0644'
 
 ############################################################
-# Step 7: Run appropriate container
+# Step 8: Run appropriate container
 ############################################################
 - name: Deploy real UAT site container
   ansible.builtin.import_tasks: run-site.yml
