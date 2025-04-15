@@ -26,6 +26,9 @@ FROM node:18.20.2-slim
 WORKDIR /app
 ENV NODE_ENV=production
 
+# Install curl for healthcheck
+RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
+
 # Copy build artifacts from builder
 COPY --from=builder /app ./
 
@@ -37,7 +40,7 @@ EXPOSE 3000
 
 # Define healthcheck for container status
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
-  CMD curl -f http://localhost:3000/healthz || exit 1
+  CMD curl -f http://localhost:3000/api/healthz || exit 1
 
 # Start the app
 CMD ["npm", "start"]
