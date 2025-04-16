@@ -110,8 +110,19 @@ pipeline {
 
     stage('Await Manual Approval to Promote GREEN') {
       steps {
-        timeout(time: 2, unit: 'HOURS') {
-          input message: "Promote BLUE container to GREEN?", ok: "Approve"
+        script {
+          try {
+            timeout(time: 2, unit: 'HOURS') {
+              def inputResult = input(
+                message: "Promote BLUE container to GREEN?",
+                ok: "Approve"
+              )
+              env.APPROVER = currentBuild.rawBuild.getCause(hudson.model.Cause$UserIdCause)?.userId
+            }
+          } catch (err) {
+            env.APPROVER = currentBuild.rawBuild.getCause(hudson.model.Cause$UserIdCause)?.userId ?: 'unknown'
+            error("Deployment approval aborted by ${env.APPROVER}")
+          }
         }
       }
 
@@ -143,6 +154,7 @@ pipeline {
                 message: """⚠️ *Approval aborted*
 • Attempted Version: *${env.LATEST_PROD_TAG}*
 • Current GREEN version still running: *${result}*
+• 👤 Aborted by: *${env.APPROVER}*
 • 🔗 <${env.BUILD_URL}|View Jenkins Build>"""
               )
             }
@@ -174,6 +186,7 @@ pipeline {
             message: """✅ *Promoted to GREEN container*
 • Version: *${env.LATEST_PROD_TAG}*
 • Environment: *${env.CLOUD_PROVIDER.toUpperCase()}*
+• 👤 Approved by: *${env.APPROVER ?: 'unknown'}*
 • 🔗 <${env.BUILD_URL}|View Jenkins Build>
 • 🌐 <${env.PROD_APP_URL}|Open Live App>"""
           )

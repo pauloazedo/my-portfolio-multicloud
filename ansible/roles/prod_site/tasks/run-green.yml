@@ -1,5 +1,4 @@
 # ansible/roles/prod_site/tasks/run-green.yml
-# Deploy the PROD Green container using the latest tagged image or fallback
 
 #####################################################################
 # Step 1: Remove existing green container (if any)
@@ -28,10 +27,18 @@
       - "{{ prod_site_green_port }}:3000"
     recreate: true
     state: started
+    env:
+      NEXT_PUBLIC_APP_VERSION: "{{ latest_prod_site_tag }}"
+      NEXT_PUBLIC_CLOUD_PROVIDER: "{{ cloud_provider | upper }}"
+      NEXT_PUBLIC_BASE_PATH: "/green"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
   when: green_image_available | bool
-  tags:
-    - prod_site
-    - deploy
+  tags: [prod_site, deploy]
 
 - name: Persist promoted green version for rollback
   ansible.builtin.copy:
@@ -41,12 +48,10 @@
     group: devops
     mode: '0644'
   when: green_image_available | bool
-  tags:
-    - prod_site
-    - promote
+  tags: [prod_site, promote]
 
 #####################################################################
-# Step 3: Run green container with fallback image (if needed)
+# Step 3: Run fallback green container (if image is missing)
 #####################################################################
 - name: Run green container with fallback image
   community.docker.docker_container:
@@ -59,6 +64,4 @@
     state: started
     env: "{{ prod_site_green_env | default({}) }}"
   when: not (green_image_available | default(false) | bool)
-  tags:
-    - prod_site
-    - fallback
+  tags: [prod_site, fallback]
