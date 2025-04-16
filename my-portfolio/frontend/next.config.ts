@@ -5,9 +5,6 @@ import type { NextConfig } from 'next';
 const nextConfig: NextConfig = {
   reactStrictMode: true,
 
-  // Enable SWC-based minification for smaller bundles
-  swcMinify: true,
-
   // Rewrite /healthz to the healthcheck API route
   async rewrites() {
     return [
@@ -18,7 +15,7 @@ const nextConfig: NextConfig = {
     ];
   },
 
-  // You can extend more features here as needed
+  // Add more config options here if needed
 };
 
 export default nextConfig;

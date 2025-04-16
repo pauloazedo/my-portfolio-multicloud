@@ -1,0 +1,10 @@
+# ansible/roles/prod_site/tasks/get-green-version.yml
+
+- name: Inspect current green container
+  community.docker.docker_container_info:
+    name: "{{ prod_site_green_container }}"
+  register: green_container_info
+
+- name: Extract current version tag
+  ansible.builtin.set_fact:
+    current_green_version: "{{ green_container_info.container.Config.Image | regex_replace('.*:v', 'v') }}"

@@ -1,3 +1,5 @@
+// Jenkinsfile.prod
+
 pipeline {
   agent any
 
@@ -15,7 +17,6 @@ pipeline {
   }
 
   stages {
-
     stage('Checkout Source') {
       steps {
         checkout scm
@@ -115,22 +116,40 @@ pipeline {
           input message: "Promote BLUE container to GREEN?", ok: "Approve"
         }
       }
+
       post {
         aborted {
-          script {
-            def currentGreenVersion = sh(
-              script: "ssh -o StrictHostKeyChecking=accept-new -i ${SSH_KEY_PATH} ${ANSIBLE_REMOTE_USER}@${ANSIBLE_TARGET_HOST} 'docker inspect --format={{.Config.Image}} prod-site-green || echo unknown'",
-              returnStdout: true
-            ).trim()
+          withCredentials([file(credentialsId: 'ansible-vault-passfile', variable: 'VAULT_PASS_FILE')]) {
+            script {
+              def output = sh(
+                script: """
+                  set -e
+                  export ANSIBLE_SSH_ARGS="-i ${SSH_KEY_PATH} -o StrictHostKeyChecking=accept-new"
+                  export ANSIBLE_REMOTE_USER=${ANSIBLE_REMOTE_USER}
 
-            slackSend (
-              channel: '#jenkins_notifications',
-              color: 'warning',
-              message: """⚠️ *Approval aborted*
+                  ${VENV_ACTIVATE} -i ${ANSIBLE_INVENTORY} ansible/prod.yml \
+                    --limit prod \
+                    --tags get_green_version \
+                    --extra-vars "cloud_provider=${env.CLOUD_PROVIDER}" \
+                    --vault-password-file "${VAULT_PASS_FILE}" \
+                    | tee /tmp/green-version.out
+                """,
+                returnStatus: false
+              )
+
+              def greenVersionOutput = readFile('/tmp/green-version.out')
+              def match = greenVersionOutput =~ /"current_green_version":\s*"?(v[\d\.]+)"?/
+              def currentVersion = match ? match[0][1] : "unknown"
+
+              slackSend (
+                channel: '#jenkins_notifications',
+                color: 'warning',
+                message: """⚠️ *Approval aborted*
 • Attempted Version: *${env.LATEST_PROD_TAG}*
-• Current GREEN version still running: *${currentGreenVersion}*
+• Current GREEN version still running: *${currentVersion}*
 • 🔗 <${env.BUILD_URL}|View Jenkins Build>"""
-            )
+              )
+            }
           }
         }
       }

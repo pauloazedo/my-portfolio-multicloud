@@ -1,6 +1,6 @@
 ---
 # ansible/prod.yml
-# PROD Infrastructure and Application Deployment (Blue/Green)
+# PROD Infrastructure and Application Deployment (Blue/Green + Fallback + Inspection)
 
 - name: Setup base infrastructure and deploy blue/green containers
   hosts: prod
@@ -12,14 +12,14 @@
     - group_vars/{{ cloud_provider }}/{{ cloud_provider }}.yml
     - group_vars/{{ cloud_provider }}/{{ cloud_provider }}.secrets.yml
 
-  # Only set a default if not passed via --extra-vars
   vars:
+    # Allow overriding this on the command line
     prod_site_target: "{{ prod_site_target | default('both') }}"
 
   tasks:
 
     ############################################################
-    # Step 1: Base Infrastructure
+    # Base Infrastructure Setup
     ############################################################
 
     - name: Include bootstrap role
@@ -49,13 +49,13 @@
         - nginx
         - certbot
 
-    - name: Include SSH access role
+    - name: Include SSH access setup (Jenkins -> PROD)
       ansible.builtin.include_role:
         name: prod_site
       tags: set_ssh_access
 
     ############################################################
-    # Step 2: Deployment (target decided by prod_site_target)
+    # Application Deployment (Blue / Green / Fallback)
     ############################################################
 
     - name: Deploy PROD container(s) based on prod_site_target
@@ -64,3 +64,13 @@
       tags:
         - prod_site
         - fallback
+
+    ############################################################
+    # Inspect Currently Running GREEN Version
+    ############################################################
+
+    - name: Get version currently running on GREEN container
+      ansible.builtin.include_role:
+        name: prod_site
+      tags:
+        - get_green_version
