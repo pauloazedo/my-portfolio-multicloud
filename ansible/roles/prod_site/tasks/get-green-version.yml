@@ -8,3 +8,8 @@
 - name: Extract current version tag
   ansible.builtin.set_fact:
     current_green_version: "{{ green_container_info.container.Config.Image | regex_replace('.*:v', 'v') }}"
+
+- name: Save current green version to file for Jenkins
+  ansible.builtin.copy:
+    dest: "/tmp/current_green_version.txt"
+    content: "{{ current_green_version }}"
