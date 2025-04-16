@@ -5,7 +5,9 @@ import type { NextConfig } from 'next';
 const nextConfig: NextConfig = {
   reactStrictMode: true,
 
-  // Rewrite /healthz to the healthcheck API route
+  // Dynamically set basePath based on env
+  basePath: process.env.NEXT_PUBLIC_BASE_PATH || '',
+
   async rewrites() {
     return [
       {
@@ -14,8 +16,6 @@ const nextConfig: NextConfig = {
       },
     ];
   },
-
-  // Add more config options here if needed
 };
 
 export default nextConfig;

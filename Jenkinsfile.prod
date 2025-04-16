@@ -1,5 +1,3 @@
-// Jenkinsfile.prod
-
 pipeline {
   agent any
 
@@ -121,29 +119,30 @@ pipeline {
         aborted {
           withCredentials([file(credentialsId: 'ansible-vault-passfile', variable: 'VAULT_PASS_FILE')]) {
             script {
-              sh '''
-                set -e
-                export ANSIBLE_SSH_ARGS="-i ${SSH_KEY_PATH} -o StrictHostKeyChecking=accept-new"
-                export ANSIBLE_REMOTE_USER=${ANSIBLE_REMOTE_USER}
+              def result = sh(
+                script: """
+                  set -e
+                  export ANSIBLE_SSH_ARGS="-i ${SSH_KEY_PATH} -o StrictHostKeyChecking=accept-new"
+                  export ANSIBLE_REMOTE_USER=${ANSIBLE_REMOTE_USER}
 
-                ${VENV_ACTIVATE} -i ${ANSIBLE_INVENTORY} ansible/prod.yml \
-                  --limit prod \
-                  --tags get_green_version \
-                  --extra-vars "cloud_provider=${CLOUD_PROVIDER}" \
-                  --vault-password-file "${VAULT_PASS_FILE}"
+                  ${VENV_ACTIVATE} -i ${ANSIBLE_INVENTORY} ansible/prod.yml \
+                    --limit prod \
+                    --tags get_green_version \
+                    --extra-vars "cloud_provider=${CLOUD_PROVIDER}" \
+                    --vault-password-file "${VAULT_PASS_FILE}"
 
-                ssh -i ${SSH_KEY_PATH} -o StrictHostKeyChecking=accept-new ${ANSIBLE_REMOTE_USER}@${ANSIBLE_TARGET_HOST} \
-                  "cat /tmp/current_green_version.txt" > current_green_version.txt
-              '''
-
-              def currentVersion = readFile('current_green_version.txt').trim()
+                  ssh -i ${SSH_KEY_PATH} -o StrictHostKeyChecking=accept-new ${ANSIBLE_REMOTE_USER}@${ANSIBLE_TARGET_HOST} \
+                    "cat /tmp/current_green_version.txt" || echo 'N/A'
+                """,
+                returnStdout: true
+              ).trim()
 
               slackSend (
                 channel: '#jenkins_notifications',
                 color: 'warning',
                 message: """⚠️ *Approval aborted*
 • Attempted Version: *${env.LATEST_PROD_TAG}*
-• Current GREEN version still running: *${currentVersion}*
+• Current GREEN version still running: *${result}*
 • 🔗 <${env.BUILD_URL}|View Jenkins Build>"""
               )
             }

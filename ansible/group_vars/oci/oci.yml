@@ -64,6 +64,9 @@ uat_site_dockerfile_path:    "my-portfolio/frontend"
 uat_site_fallback_image:     "{{ uat_site_waiting_image }}"
 uat_site_fallback_build_dir: "/home/devops/uat-fallback"
 
+# Prevent template crash in UAT where prod_site_target isn't used
+prod_site_target: none
+
 ############################################################
 # PROD Site Configuration (Blue/Green Deployments)
 ############################################################
