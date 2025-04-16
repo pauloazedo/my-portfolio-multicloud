@@ -34,7 +34,7 @@ pipeline {
 
     stage('Discover Latest Tag from OCIR') {
       steps {
-        withCredentials([string(credentialsId: 'ocir-token', variable: 'OCIR_PASSWORD')]) {
+        withCredentials([string(credentialsId: 'ocir-creds', variable: 'OCIR_PASSWORD')]) {
           script {
             def latestTag = sh(
               script: """
