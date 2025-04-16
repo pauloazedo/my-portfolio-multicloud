@@ -111,3 +111,18 @@
 - name: Final Docker cleanup
   ansible.builtin.import_tasks: docker-prune.yml
   tags: [prod_site, cleanup]
+
+#####################################################################
+# Step 9: Record currently promoted green version
+#####################################################################
+- name: Write current green version to file
+  ansible.builtin.copy:
+    content: "{{ prod_site_green_image }}"
+    dest: /tmp/current_green_version.txt
+    owner: "{{ ansible_user | default('devops') }}"
+    group: "{{ ansible_user | default('devops') }}"
+    mode: '0644'
+  when:
+    - prod_site_green_image is defined
+    - prod_site_target in ["green", "both"] or ('get_green_version' in ansible_run_tags)
+  tags: always

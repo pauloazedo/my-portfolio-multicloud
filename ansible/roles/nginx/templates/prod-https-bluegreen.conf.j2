@@ -15,15 +15,19 @@ server {
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
     }
 
-    location /green/ {
-        proxy_pass http://localhost:{{ prod_site_green_port }}/;
+    # Blue path — strip /blue/ prefix
+    location /blue/ {
+        rewrite ^/blue/(.*)$ /$1 break;
+        proxy_pass http://localhost:{{ prod_site_blue_port }}/;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
     }
 
-    location /blue/ {
-        proxy_pass http://localhost:{{ prod_site_blue_port }}/;
+    # Green path — strip /green/ prefix
+    location /green/ {
+        rewrite ^/green/(.*)$ /$1 break;
+        proxy_pass http://localhost:{{ prod_site_green_port }}/;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
