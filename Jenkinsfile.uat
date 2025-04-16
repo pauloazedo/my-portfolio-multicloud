@@ -23,17 +23,16 @@ pipeline {
         script {
           echo "🧭 Using CLOUD_PROVIDER=${env.CLOUD_PROVIDER}"
 
-          // Define cloud-specific values
           def cloudVars = [
             oci: [
-              ANSIBLE_INVENTORY: 'ansible/inventory/oci.ini',
-              OCIR_REPO:         'iad.ocir.io/idtijq8cx4jl/my-portfolio-site',
+              ANSIBLE_INVENTORY:   'ansible/inventory/oci.ini',
+              OCIR_REPO:           'iad.ocir.io/idtijq8cx4jl/my-portfolio-site',
               ANSIBLE_TARGET_HOST: 'oci.uat.pauloazedo.dev',
               UAT_APP_URL:         'https://oci.uat.pauloazedo.dev'
             ],
             aws: [
-              ANSIBLE_INVENTORY: 'ansible/inventory/aws.ini',
-              OCIR_REPO:         'aws_account_id.dkr.ecr.region.amazonaws.com/my-portfolio-site', // Replace when ready
+              ANSIBLE_INVENTORY:   'ansible/inventory/aws.ini',
+              OCIR_REPO:           'aws_account_id.dkr.ecr.region.amazonaws.com/my-portfolio-site',
               ANSIBLE_TARGET_HOST: 'aws.uat.pauloazedo.dev',
               UAT_APP_URL:         'https://aws.uat.pauloazedo.dev'
             ]
@@ -44,7 +43,6 @@ pipeline {
             error "Unknown CLOUD_PROVIDER: '${env.CLOUD_PROVIDER}'"
           }
 
-          // Inject into environment
           env.ANSIBLE_INVENTORY   = selected.ANSIBLE_INVENTORY
           env.OCIR_REPO           = selected.OCIR_REPO
           env.ANSIBLE_TARGET_HOST = selected.ANSIBLE_TARGET_HOST
@@ -64,6 +62,7 @@ pipeline {
             currentBuild.result = 'NOT_BUILT'
             return
           }
+
           env.IMAGE_TAG = tagName
           echo "🧠 Pipeline triggered by tag: ${env.IMAGE_TAG} on ${env.CLOUD_PROVIDER.toUpperCase()}"
         }
@@ -79,9 +78,7 @@ pipeline {
             url: 'https://github.com/pauloazedo/my-portfolio-multicloud.git',
             credentialsId: 'github-credentials'
           ]],
-          doGenerateSubmoduleConfigurations: false,
-          extensions: [[$class: 'CleanCheckout']],
-          submoduleCfg: []
+          extensions: [[$class: 'CleanCheckout']]
         ])
       }
     }
@@ -129,9 +126,7 @@ pipeline {
   post {
     success {
       script {
-        def repo = env.OCIR_REPO ?: 'unknown'
-        echo "✅ UAT deployment completed: ${repo}:${env.IMAGE_TAG}"
-        slackSend (
+        slackSend(
           channel: '#jenkins_notifications',
           color: 'good',
           message: """🚀 Version `${env.IMAGE_TAG}` was published to *UAT (${env.CLOUD_PROVIDER.toUpperCase()})* and is ready for user acceptance testing.
@@ -142,11 +137,16 @@ pipeline {
     }
 
     failure {
-      slackSend (
-        channel: '#jenkins_notifications',
-        color: 'danger',
-        message: "❌ *UAT Pipeline FAILED* for `${env.JOB_NAME}` on ${env.CLOUD_PROVIDER.toUpperCase()}.\n🔗 <${env.BUILD_URL}|View Jenkins Build>"
-      )
+      script {
+        def version = env.IMAGE_TAG ?: "unknown"
+        slackSend(
+          channel: '#jenkins_notifications',
+          color: 'danger',
+          message: """❌ *UAT Pipeline FAILED* for `${env.JOB_NAME}` on ${env.CLOUD_PROVIDER.toUpperCase()}.
+🧪 Version: `${version}`
+🔗 <${env.BUILD_URL}|View Jenkins Build>"""
+        )
+      }
     }
   }
 }
