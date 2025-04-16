@@ -30,7 +30,6 @@
     env:
       NEXT_PUBLIC_APP_VERSION: "{{ latest_prod_site_tag }}"
       NEXT_PUBLIC_CLOUD_PROVIDER: "{{ cloud_provider | upper }}"
-      NEXT_PUBLIC_BASE_PATH: "/green"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3000/"]
       interval: 30s
