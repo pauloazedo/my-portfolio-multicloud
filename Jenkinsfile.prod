@@ -11,7 +11,6 @@ pipeline {
     VAULT_PASS_FILE       = '/var/jenkins_home/.vault_pass'
     CLOUD_PROVIDER        = 'oci'
     OCIR_REPO             = 'iad.ocir.io/idtijq8cx4jl/my-portfolio-site'
-    OCIR_USER             = 'idtijq8cx4jl/devops.user'
   }
 
   options {
@@ -34,11 +33,15 @@ pipeline {
 
     stage('Discover Latest Tag from OCIR') {
       steps {
-        withCredentials([string(credentialsId: 'ocir-creds', variable: 'OCIR_PASSWORD')]) {
+        withCredentials([usernamePassword(
+          credentialsId: 'ocir-creds',
+          usernameVariable: 'OCIR_USER',
+          passwordVariable: 'OCIR_PASSWORD'
+        )]) {
           script {
             def latestTag = sh(
               script: """
-                skopeo list-tags --creds ${OCIR_USER}:${OCIR_PASSWORD} docker://${OCIR_REPO} | jq -r .Tags[] | sort -V | tail -n1
+                skopeo list-tags --creds $OCIR_USER:$OCIR_PASSWORD docker://$OCIR_REPO | jq -r .Tags[] | sort -V | tail -n1
               """,
               returnStdout: true
             ).trim()
