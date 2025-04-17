@@ -38,15 +38,17 @@ pipeline {
           usernameVariable: 'OCIR_USER',
           passwordVariable: 'OCIR_PASSWORD'
         )]) {
-          script {
-            def latestTag = sh(
-              script: """
-                skopeo list-tags --creds $OCIR_USER:$OCIR_PASSWORD docker://$OCIR_REPO | jq -r .Tags[] | sort -V | tail -n1
-              """,
-              returnStdout: true
-            ).trim()
-            env.LATEST_TAG = latestTag
-            echo "✅ Latest OCIR tag: ${env.LATEST_TAG}"
+          withEnv(["SKOPEO_AUTH=${OCIR_USER}:${OCIR_PASSWORD}"]) {
+            script {
+              def latestTag = sh(
+                script: '''
+                  skopeo list-tags --creds "$SKOPEO_AUTH" docker://$OCIR_REPO | jq -r '.Tags[]' | sort -V | tail -n1
+                ''',
+                returnStdout: true
+              ).trim()
+              env.LATEST_TAG = latestTag
+              echo "✅ Latest OCIR tag: ${env.LATEST_TAG}"
+            }
           }
         }
       }
