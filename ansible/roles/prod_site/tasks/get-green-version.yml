@@ -5,11 +5,15 @@
     name: "{{ prod_site_green_container }}"
   register: green_container_info
 
-- name: Extract current version tag
+- name: Extract current version tag from green container image
   ansible.builtin.set_fact:
-    current_green_version: "{{ green_container_info.container.Config.Image | regex_replace('.*:v', 'v') }}"
+    current_green_version: >-
+      {{ (green_container_info.container.Config.Image | default('')) | regex_replace('^.+:(v[0-9.]+)$', '\\1') }}
 
 - name: Save current green version to file for Jenkins
   ansible.builtin.copy:
     dest: "/tmp/current_green_version.txt"
     content: "{{ current_green_version }}"
+    owner: "{{ ansible_user | default('devops') }}"
+    group: "{{ ansible_user | default('devops') }}"
+    mode: '0644'

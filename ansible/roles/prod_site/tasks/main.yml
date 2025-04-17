@@ -29,12 +29,11 @@
   changed_when: false
 
 #####################################################################
-# Step 3: Set image references for blue/green containers
+# Step 3: Set single image reference (prod_site_tag)
 #####################################################################
-- name: Set image references for blue/green containers
+- name: Set image reference from latest tag
   ansible.builtin.set_fact:
-    prod_site_blue_image: "{{ prod_site_image_repo }}:{{ latest_prod_site_tag }}"
-    prod_site_green_image: "{{ prod_site_image_repo }}:{{ latest_prod_site_tag }}"
+    prod_site_tag: "{{ prod_site_image_repo }}:{{ latest_prod_site_tag }}"
   when:
     - latest_prod_site_tag is defined
     - latest_prod_site_tag | length > 0
@@ -43,7 +42,7 @@
 #####################################################################
 # Step 4: Check image availability
 #####################################################################
-- name: Check availability of versioned images
+- name: Check availability of versioned image
   ansible.builtin.include_tasks: check_images.yml
   when:
     - not (force_fallback | default(false))
@@ -52,7 +51,7 @@
   tags: [fallback, prod_site]
 
 #####################################################################
-# Step 5: Run fallback logic if no tags were found or forced
+# Step 5: Run fallback logic if no tag was found or fallback is forced
 #####################################################################
 - name: Skip blue/green deploy and run fallback if no image is available
   ansible.builtin.include_tasks: run-fallback.yml
@@ -117,12 +116,12 @@
 #####################################################################
 - name: Write current green version to file
   ansible.builtin.copy:
-    content: "{{ prod_site_green_image }}"
+    content: "{{ prod_site_tag }}"
     dest: /tmp/current_green_version.txt
     owner: "{{ ansible_user | default('devops') }}"
     group: "{{ ansible_user | default('devops') }}"
     mode: '0644'
   when:
-    - prod_site_green_image is defined
+    - prod_site_tag is defined
     - prod_site_target in ["green", "both"] or ('get_green_version' in ansible_run_tags)
   tags: always

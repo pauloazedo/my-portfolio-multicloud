@@ -18,17 +18,17 @@
 #####################################################################
 # Step 2: Run blue container with main image
 #####################################################################
-- name: Run blue container with versioned image ({{ latest_prod_site_tag }})
+- name: Run blue container with versioned image ({{ prod_site_tag }})
   community.docker.docker_container:
     name: "{{ prod_site_blue_container }}"
-    image: "{{ prod_site_blue_image }}"
+    image: "{{ prod_site_tag }}"
     restart_policy: always
     published_ports:
       - "{{ prod_site_blue_port }}:3000"
     recreate: true
     state: started
     env:
-      NEXT_PUBLIC_APP_VERSION: "{{ latest_prod_site_tag }}"
+      NEXT_PUBLIC_APP_VERSION: "{{ prod_site_tag }}"
       NEXT_PUBLIC_CLOUD_PROVIDER: "{{ cloud_provider | upper }}"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3000/"]
