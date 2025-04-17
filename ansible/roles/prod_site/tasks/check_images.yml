@@ -1,53 +1,36 @@
 # ansible/roles/prod_site/tasks/check_images.yml
-# Pull latest versioned blue/green images and check availability (multi-cloud)
+# Pull and verify availability of versioned image for blue/green deployment
 
 #####################################################################
-# Step 1: Try pulling green image
+# Step 1: Try pulling the versioned image
 #####################################################################
-- name: "Try to pull green image (tag: {{ latest_prod_site_tag }})"
+- name: "Try to pull versioned image (tag: {{ latest_prod_site_tag }})"
   community.docker.docker_image:
-    name: "{{ prod_site_green_image }}"
+    name: "{{ prod_site_tag }}"
     source: pull
-  register: green_image_check
+  register: prod_image_pull
   failed_when: false
   ignore_errors: true
   tags: [fallback, prod_site]
 
 #####################################################################
-# Step 2: Try pulling blue image
+# Step 2: Inspect local presence of versioned image
 #####################################################################
-- name: "Try to pull blue image (tag: {{ latest_prod_site_tag }})"
-  community.docker.docker_image:
-    name: "{{ prod_site_blue_image }}"
-    source: pull
-  register: blue_image_check
-  failed_when: false
-  ignore_errors: true
-  tags: [fallback, prod_site]
-
-#####################################################################
-# Step 3: Inspect local image presence
-#####################################################################
-- name: Inspect local green image
+- name: "Inspect local image info (tag: {{ latest_prod_site_tag }})"
   community.docker.docker_image_info:
-    name: "{{ prod_site_green_image }}"
-  register: green_image_info
+    name: "{{ prod_site_tag }}"
+  register: prod_image_info
   failed_when: false
   changed_when: false
   tags: [fallback, prod_site]
 
-- name: Inspect local blue image
-  community.docker.docker_image_info:
-    name: "{{ prod_site_blue_image }}"
-  register: blue_image_info
-  failed_when: false
-  changed_when: false
-  tags: [fallback, prod_site]
-
-- name: Set image availability flags for blue/green
+#####################################################################
+# Step 3: Set availability flags for both blue and green
+#####################################################################
+- name: Set image availability flags for both blue and green
   ansible.builtin.set_fact:
-    green_image_available: "{{ (green_image_info.images | length > 0) | default(false) }}"
-    blue_image_available: "{{ (blue_image_info.images | length > 0) | default(false) }}"
+    green_image_available: "{{ (prod_image_info.images | length > 0) | default(false) }}"
+    blue_image_available: "{{ (prod_image_info.images | length > 0) | default(false) }}"
   tags: [fallback, prod_site]
 
 #####################################################################
@@ -57,6 +40,7 @@
   ansible.builtin.debug:
     msg:
       - "Latest prod-site tag: {{ latest_prod_site_tag }}"
+      - "Image available locally: {{ prod_image_info.images | length > 0 }}"
       - "Green image available: {{ green_image_available }}"
       - "Blue image available:  {{ blue_image_available }}"
   tags: [fallback, prod_site]

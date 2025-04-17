@@ -1,24 +1,31 @@
 // Jenkinsfile.prod
 
+// Helper: Slack notification
+def sendSlackNotification(String message) {
+  withCredentials([string(credentialsId: 'jenkins-slack-token', variable: 'SLACK_WEBHOOK_URL')]) {
+    writeFile file: 'slack_payload.json', text: """{ "text": "${message}" }"""
+    sh '''
+      set -e
+      curl -X POST -H "Content-type: application/json" \
+        --data @slack_payload.json \
+        "$SLACK_WEBHOOK_URL"
+    '''
+  }
+}
+
 pipeline {
   agent any
 
   environment {
-    ANSIBLE_INVENTORY     = 'ansible/inventory/oci.ini'
-    SSH_KEY_PATH          = '/var/jenkins_home/.ssh/id_rsa'
-    ANSIBLE_REMOTE_USER   = 'devops'
-    ANSIBLE_TARGET_HOST   = 'oci.prod.pauloazedo.dev'
-    VAULT_PASS_FILE       = '/var/jenkins_home/.vault_pass'
-    CLOUD_PROVIDER        = 'oci'
-    OCIR_REPO             = 'iad.ocir.io/idtijq8cx4jl/my-portfolio-site'
-  }
-
-  options {
-    timestamps()
-    ansiColor('xterm')
+    ANSIBLE_INVENTORY   = 'ansible/inventory/oci.ini'
+    SSH_KEY_PATH        = '/var/jenkins_home/.ssh/id_rsa'
+    ANSIBLE_REMOTE_USER = 'devops'
+    ANSIBLE_TARGET_HOST = 'oci.prod.pauloazedo.dev'
+    CLOUD_PROVIDER      = 'oci'
   }
 
   stages {
+
     stage('Checkout Source') {
       steps {
         checkout scm
@@ -35,19 +42,21 @@ pipeline {
       steps {
         withCredentials([usernamePassword(
           credentialsId: 'ocir-creds',
-          usernameVariable: 'OCIR_USER',
+          usernameVariable: 'OCIR_USERNAME',
           passwordVariable: 'OCIR_PASSWORD'
         )]) {
-          withEnv(["SKOPEO_AUTH=${OCIR_USER}:${OCIR_PASSWORD}"]) {
+          withEnv(["OCIR_AUTH=${env.OCIR_USERNAME}:${env.OCIR_PASSWORD}"]) {
             script {
-              def latestTag = sh(
-                script: '''
-                  skopeo list-tags --creds "$SKOPEO_AUTH" docker://$OCIR_REPO | jq -r '.Tags[]' | sort -V | tail -n1
-                ''',
-                returnStdout: true
-              ).trim()
-              env.LATEST_TAG = latestTag
-              echo "✅ Latest OCIR tag: ${env.LATEST_TAG}"
+              def result = sh(script: '''
+                skopeo list-tags --creds "$OCIR_AUTH" \
+                  docker://iad.ocir.io/idtijq8cx4jl/my-portfolio-site \
+                | jq -r .Tags[] \
+                | sort -V \
+                | tail -n1
+              ''', returnStdout: true).trim()
+
+              env.latest_prod_site_tag = result
+              echo "✅ Latest OCIR tag: ${env.latest_prod_site_tag}"
             }
           }
         }
@@ -56,72 +65,71 @@ pipeline {
 
     stage('Deploy Latest Tag to BLUE Container') {
       steps {
-        withCredentials([file(credentialsId: 'ansible-vault-pass', variable: 'VAULT_PASS_FILE')]) {
+        withCredentials([file(credentialsId: 'ansible-vault-passfile', variable: 'VAULT_PASSFILE')]) {
           sh '''
-            set -e
-            export ANSIBLE_SSH_ARGS="-i ${SSH_KEY_PATH} -o StrictHostKeyChecking=accept-new"
-            export ANSIBLE_REMOTE_USER=${ANSIBLE_REMOTE_USER}
-            /home/jenkins/venv/bin/ansible-playbook -i ${ANSIBLE_INVENTORY} ansible/prod.yml \
-              --limit prod --tags prod_site,fallback \
-              --extra-vars "prod_site_target=blue latest_prod_site_tag=${LATEST_TAG}" \
-              --vault-password-file "${VAULT_PASS_FILE}"
+            ansible-playbook ansible/site.yml \
+              -i ${ANSIBLE_INVENTORY} \
+              -u ${ANSIBLE_REMOTE_USER} \
+              --private-key ${SSH_KEY_PATH} \
+              -e prod_site_tag=${latest_prod_site_tag} \
+              --vault-password-file ${VAULT_PASSFILE} \
+              --tags run_blue
           '''
         }
 
-        slackSend (
-          channel: '#jenkins_notifications',
-          color: '#439FE0',
-          tokenCredentialId: 'jenkins-slack-token',
-          message: ":large_blue_circle: Deployed version *${env.LATEST_TAG}* to BLUE container.\nAwaiting manual approval to promote to GREEN."
-        )
+        script {
+          sendSlackNotification("🚀 *v${env.latest_prod_site_tag}* deployed to *blue container* and is awaiting approval.")
+        }
       }
     }
 
     stage('Await Manual Approval to Promote GREEN') {
       steps {
-        script {
-          try {
-            timeout(time: 2, unit: 'HOURS') {
-              input(
-                message: "Promote BLUE container to GREEN?",
-                ok: "Approve",
-                submitterParameter: 'APPROVED_BY'
-              )
-            }
-          } catch (err) {
-            env.APPROVED_BY = 'unknown'
-            slackSend (
-              channel: '#jenkins_notifications',
-              color: 'danger',
-              tokenCredentialId: 'jenkins-slack-token',
-              message: ":x: Deployment aborted by user.\nCurrent GREEN version remains unchanged."
-            )
-            error("Deployment approval aborted.")
-          }
+        timeout(time: 2, unit: 'HOURS') {
+          input message: "Promote v${env.latest_prod_site_tag} to green?"
         }
       }
     }
 
     stage('Promote BLUE to GREEN Container') {
       steps {
-        withCredentials([file(credentialsId: 'ansible-vault-pass', variable: 'VAULT_PASS_FILE')]) {
+        withCredentials([file(credentialsId: 'ansible-vault-passfile', variable: 'VAULT_PASSFILE')]) {
           sh '''
-            set -e
-            export ANSIBLE_SSH_ARGS="-i ${SSH_KEY_PATH} -o StrictHostKeyChecking=accept-new"
-            export ANSIBLE_REMOTE_USER=${ANSIBLE_REMOTE_USER}
-            /home/jenkins/venv/bin/ansible-playbook -i ${ANSIBLE_INVENTORY} ansible/prod.yml \
-              --limit prod --tags prod_site \
-              --extra-vars "prod_site_target=green latest_prod_site_tag=${LATEST_TAG}" \
-              --vault-password-file "${VAULT_PASS_FILE}"
+            ansible-playbook ansible/site.yml \
+              -i ${ANSIBLE_INVENTORY} \
+              -u ${ANSIBLE_REMOTE_USER} \
+              --private-key ${SSH_KEY_PATH} \
+              -e prod_site_tag=${latest_prod_site_tag} \
+              --vault-password-file ${VAULT_PASSFILE} \
+              --tags run_green
           '''
         }
 
-        slackSend (
-          channel: '#jenkins_notifications',
-          color: 'good',
-          tokenCredentialId: 'jenkins-slack-token',
-          message: ":green_circle: Promoted version *${env.LATEST_TAG}* to GREEN container.\n👤 Approved by: *${env.APPROVED_BY}*"
-        )
+        script {
+          sendSlackNotification("✅ *v${env.latest_prod_site_tag}* promoted to *green container* and is now live.")
+        }
+      }
+    }
+  }
+
+  post {
+    aborted {
+      withCredentials([file(credentialsId: 'ansible-vault-passfile', variable: 'VAULT_PASSFILE')]) {
+        script {
+          def currentGreen = sh(script: '''
+            ansible-playbook ansible/site.yml \
+              -i ${ANSIBLE_INVENTORY} \
+              -u ${ANSIBLE_REMOTE_USER} \
+              --private-key ${SSH_KEY_PATH} \
+              --vault-password-file ${VAULT_PASSFILE} \
+              --tags get_green_version \
+              -e ansible_shell_type=bash \
+              -e ansible_shell_executable=/bin/bash \
+            | grep -oE "v[0-9]+\\.[0-9]+\\.[0-9]+"
+          ''', returnStdout: true).trim()
+
+          sendSlackNotification("⚠️ Deployment *aborted*. Current green version remains *${currentGreen}*.")
+        }
       }
     }
   }

@@ -31,6 +31,12 @@ prod_site_waiting_image: "{{ container_registry_url }}/{{ ocir_namespace }}/prod
 # UAT dynamic tag reference
 uat_site_image: "{{ uat_site_ocir_repo }}:{{ uat_site_image_tag | default('latest') }}"
 
+# PROD dynamic tag reference (used by both blue and green containers)
+prod_site_tag: ""  # Will be set at runtime based on latest_prod_site_tag
+
+# Used to force fallback bypass (even if image is available)
+force_fallback: false
+
 ############################################################
 # Domain and FQDN Configuration
 ############################################################
@@ -75,9 +81,3 @@ prod_site_green_port:      3100
 
 prod_site_blue_container:  "prod-site-blue"
 prod_site_blue_port:       3200
-
-# Will be set dynamically at runtime
-# latest_prod_site_image: "{{ prod_site_image_repo }}:v0.0.70"
-
-# Used to force fallback bypass
-force_fallback: false
