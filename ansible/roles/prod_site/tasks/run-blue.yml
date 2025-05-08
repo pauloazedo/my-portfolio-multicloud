@@ -18,10 +18,10 @@
 #####################################################################
 # Step 2: Run blue container with main image
 #####################################################################
-- name: Run blue container with versioned image ({{ prod_site_tag }})
+- name: Run blue container with versioned image ({{ prod_site_image }})
   community.docker.docker_container:
     name: "{{ prod_site_blue_container }}"
-    image: "{{ prod_site_tag }}"
+    image: "{{ prod_site_image }}"
     restart_policy: always
     published_ports:
       - "{{ prod_site_blue_port }}:3000"
