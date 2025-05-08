@@ -4,12 +4,12 @@
 def sendSlackNotification(String message) {
   withCredentials([string(credentialsId: 'jenkins-slack-token', variable: 'SLACK_WEBHOOK_URL')]) {
     writeFile file: 'slack_payload.json', text: """{ "text": "${message}" }"""
-    sh '''
+    sh """
       set -e
       curl -X POST -H "Content-type: application/json" \
         --data @slack_payload.json \
-        "$SLACK_WEBHOOK_URL"
-    '''
+        "${SLACK_WEBHOOK_URL}"
+    """
   }
 }
 
@@ -30,6 +30,7 @@ pipeline {
     stage('Checkout Source') {
       steps {
         checkout scm
+        //echo "Skipping Git checkout – running from inline script"
       }
     }
 
