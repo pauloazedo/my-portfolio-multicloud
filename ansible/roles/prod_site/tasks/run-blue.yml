@@ -1,5 +1,3 @@
-# ansible/roles/prod_site/tasks/run-blue.yml
-
 #####################################################################
 # Step 1: Remove existing blue container
 #####################################################################
@@ -10,10 +8,12 @@
     force_kill: true
   register: blue_cleanup
   ignore_errors: true
+  tags: [prod_site, run_blue, cleanup]
 
 - name: Log blue container cleanup result
   ansible.builtin.debug:
     msg: "Removed existing blue container: {{ blue_cleanup.changed }}"
+  tags: [prod_site, run_blue, cleanup]
 
 #####################################################################
 # Step 2: Run blue container with main image
@@ -39,13 +39,13 @@
       retries: 3
       start_period: 10s
   when: blue_image_available | bool
-  tags: [prod_site, deploy]
+  tags: [prod_site, run_blue, deploy]
 
 - name: Log skipping blue deploy – image not available
   ansible.builtin.debug:
     msg: "Blue image not available — fallback container will be used."
   when: not blue_image_available | default(false) | bool
-  tags: [prod_site, fallback]
+  tags: [prod_site, run_blue, fallback]
 
 #####################################################################
 # Step 3: Run fallback blue container
@@ -61,4 +61,4 @@
     state: started
     env: "{{ prod_site_blue_env | default({}) }}"
   when: not blue_image_available | default(false) | bool
-  tags: [prod_site, fallback]
+  tags: [prod_site, run_blue, fallback]
