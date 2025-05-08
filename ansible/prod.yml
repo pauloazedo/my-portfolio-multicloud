@@ -52,7 +52,8 @@
     - name: Include SSH access setup (Jenkins -> PROD)
       ansible.builtin.include_role:
         name: prod_site
-      tags: set_ssh_access
+      tags:
+        - set_ssh_access
 
     ############################################################
     # Application Deployment (Blue / Green / Fallback)
@@ -63,7 +64,10 @@
         name: prod_site
       tags:
         - prod_site
+        - run_blue
+        - run_green
         - fallback
+        - check_images
 
     ############################################################
     # Inspect Currently Running GREEN Version
