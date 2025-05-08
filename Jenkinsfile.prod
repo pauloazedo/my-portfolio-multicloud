@@ -22,6 +22,7 @@ pipeline {
     ANSIBLE_REMOTE_USER = 'devops'
     ANSIBLE_TARGET_HOST = 'oci.prod.pauloazedo.dev'
     CLOUD_PROVIDER      = 'oci'
+    VENV_ACTIVATE       = '/home/jenkins/venv/bin/ansible-playbook'
   }
 
   stages {
@@ -67,7 +68,7 @@ pipeline {
       steps {
         withCredentials([file(credentialsId: 'ansible-vault-passfile', variable: 'VAULT_PASSFILE')]) {
           sh '''
-            ansible-playbook ansible/site.yml \
+            ${VENV_ACTIVATE} ansible/site.yml \
               -i ${ANSIBLE_INVENTORY} \
               -u ${ANSIBLE_REMOTE_USER} \
               --private-key ${SSH_KEY_PATH} \
@@ -95,7 +96,7 @@ pipeline {
       steps {
         withCredentials([file(credentialsId: 'ansible-vault-passfile', variable: 'VAULT_PASSFILE')]) {
           sh '''
-            ansible-playbook ansible/site.yml \
+            ${VENV_ACTIVATE} ansible/site.yml \
               -i ${ANSIBLE_INVENTORY} \
               -u ${ANSIBLE_REMOTE_USER} \
               --private-key ${SSH_KEY_PATH} \
@@ -117,7 +118,7 @@ pipeline {
       withCredentials([file(credentialsId: 'ansible-vault-passfile', variable: 'VAULT_PASSFILE')]) {
         script {
           def currentGreen = sh(script: '''
-            ansible-playbook ansible/site.yml \
+            ${VENV_ACTIVATE} ansible/site.yml \
               -i ${ANSIBLE_INVENTORY} \
               -u ${ANSIBLE_REMOTE_USER} \
               --private-key ${SSH_KEY_PATH} \
