@@ -8,6 +8,7 @@ pipeline {
     ANSIBLE_TARGET_HOST = 'oci.prod.pauloazedo.dev'
     CLOUD_PROVIDER      = 'oci'
     VENV_ACTIVATE       = '/home/jenkins/venv/bin/ansible-playbook'
+    OCIR_REPO           = 'iad.ocir.io/idtijq8cx4jl/my-portfolio-site'
   }
 
   stages {
@@ -35,7 +36,7 @@ pipeline {
             script {
               def result = sh(script: '''
                 skopeo list-tags --creds "$OCIR_AUTH" \
-                  docker://iad.ocir.io/idtijq8cx4jl/my-portfolio-site \
+                  docker://${OCIR_REPO} \
                 | jq -r .Tags[] \
                 | sort -V \
                 | tail -n1
@@ -52,16 +53,17 @@ pipeline {
     stage('Deploy Latest Tag to BLUE Container') {
       steps {
         withCredentials([file(credentialsId: 'ansible-vault-passfile', variable: 'VAULT_PASSFILE')]) {
-          sh '''
+          sh """
             set -e
             export ANSIBLE_SSH_ARGS="-i ${SSH_KEY_PATH} -o StrictHostKeyChecking=accept-new"
             export ANSIBLE_REMOTE_USER=${ANSIBLE_REMOTE_USER}
 
             ${VENV_ACTIVATE} -i ${ANSIBLE_INVENTORY} ansible/prod.yml \
               --tags run_blue,check_images \
-              --extra-vars "prod_site_tag=${latest_prod_site_tag}" \
+              --extra-vars "prod_site_tag=${latest_prod_site_tag} \
+                            prod_site_custom_image=${OCIR_REPO}:${latest_prod_site_tag}" \
               --vault-password-file "${VAULT_PASSFILE}"
-          '''
+          """
         }
 
         slackSend(
@@ -83,16 +85,17 @@ pipeline {
     stage('Promote BLUE to GREEN Container') {
       steps {
         withCredentials([file(credentialsId: 'ansible-vault-passfile', variable: 'VAULT_PASSFILE')]) {
-          sh '''
+          sh """
             set -e
             export ANSIBLE_SSH_ARGS="-i ${SSH_KEY_PATH} -o StrictHostKeyChecking=accept-new"
             export ANSIBLE_REMOTE_USER=${ANSIBLE_REMOTE_USER}
 
             ${VENV_ACTIVATE} -i ${ANSIBLE_INVENTORY} ansible/prod.yml \
               --tags run_green \
-              --extra-vars "prod_site_tag=${latest_prod_site_tag}" \
+              --extra-vars "prod_site_tag=${latest_prod_site_tag} \
+                            prod_site_custom_image=${OCIR_REPO}:${latest_prod_site_tag}" \
               --vault-password-file "${VAULT_PASSFILE}"
-          '''
+          """
         }
 
         slackSend(
@@ -108,7 +111,7 @@ pipeline {
     aborted {
       withCredentials([file(credentialsId: 'ansible-vault-passfile', variable: 'VAULT_PASSFILE')]) {
         script {
-          def currentGreen = sh(script: '''
+          def currentGreen = sh(script: """
             set -e
             export ANSIBLE_SSH_ARGS="-i ${SSH_KEY_PATH} -o StrictHostKeyChecking=accept-new"
             export ANSIBLE_REMOTE_USER=${ANSIBLE_REMOTE_USER}
@@ -119,7 +122,7 @@ pipeline {
               -e ansible_shell_type=bash \
               -e ansible_shell_executable=/bin/bash \
             | grep -oE "v[0-9]+\\.[0-9]+\\.[0-9]+"
-          ''', returnStdout: true).trim()
+          """, returnStdout: true).trim()
 
           slackSend(
             channel: '#jenkins_notifications',
