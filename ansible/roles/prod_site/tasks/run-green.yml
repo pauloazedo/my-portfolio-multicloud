@@ -18,10 +18,10 @@
 #####################################################################
 # Step 2: Run green container with versioned image
 #####################################################################
-- name: Run green container with versioned image ({{ prod_site_tag }})
+- name: Run green container with versioned image ({{ prod_site_image }})
   community.docker.docker_container:
     name: "{{ prod_site_green_container }}"
-    image: "{{ prod_site_tag }}"
+    image: "{{ prod_site_image }}"
     restart_policy: always
     published_ports:
       - "{{ prod_site_green_port }}:3000"
