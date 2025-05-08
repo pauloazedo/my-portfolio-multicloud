@@ -1,13 +1,12 @@
 // Jenkinsfile.prod
 
-// Helper: Slack notification
 def sendSlackNotification(String message) {
   withCredentials([string(credentialsId: 'jenkins-slack-token', variable: 'SLACK_WEBHOOK_URL')]) {
     writeFile file: 'slack_payload.json', text: """{ "text": "${message}" }"""
     sh """
       set -e
-      curl -X POST -H "Content-type: application/json" \
-        --data @slack_payload.json \
+      curl -X POST -H "Content-type: application/json" \\
+        --data @slack_payload.json \\
         "${SLACK_WEBHOOK_URL}"
     """
   }
@@ -20,7 +19,6 @@ pipeline {
     ANSIBLE_INVENTORY   = 'ansible/inventory/oci.ini'
     SSH_KEY_PATH        = '/var/jenkins_home/.ssh/id_rsa'
     ANSIBLE_REMOTE_USER = 'devops'
-    ANSIBLE_TARGET_HOST = 'oci.prod.pauloazedo.dev'
     CLOUD_PROVIDER      = 'oci'
     VENV_ACTIVATE       = '/home/jenkins/venv/bin/ansible-playbook'
   }
@@ -70,16 +68,16 @@ pipeline {
     stage('Deploy Latest Tag to BLUE Container') {
       steps {
         withCredentials([file(credentialsId: 'ansible-vault-passfile', variable: 'VAULT_PASSFILE')]) {
-          sh '''
+          sh """
             set -e
-            export ANSIBLE_SSH_ARGS="-i ${SSH_KEY_PATH} -o StrictHostKeyChecking=accept-new"
+            export ANSIBLE_SSH_ARGS='-i ${SSH_KEY_PATH} -o StrictHostKeyChecking=accept-new'
             export ANSIBLE_REMOTE_USER=${ANSIBLE_REMOTE_USER}
 
-            ${VENV_ACTIVATE} -i ${ANSIBLE_INVENTORY} ansible/prod.yml \
-              --tags run_blue,check_images \
-              --extra-vars "prod_site_tag=${latest_prod_site_tag} prod_site_image=${prod_site_image} blue_image_available=true" \
+            ${VENV_ACTIVATE} -i ${ANSIBLE_INVENTORY} ansible/prod.yml \\
+              --tags run_blue,check_images \\
+              --extra-vars "prod_site_tag=${latest_prod_site_tag} prod_site_image=${prod_site_image} blue_image_available=true" \\
               --vault-password-file "${VAULT_PASSFILE}"
-          '''
+          """
         }
 
         script {
@@ -99,16 +97,16 @@ pipeline {
     stage('Promote BLUE to GREEN Container') {
       steps {
         withCredentials([file(credentialsId: 'ansible-vault-passfile', variable: 'VAULT_PASSFILE')]) {
-          sh '''
+          sh """
             set -e
-            export ANSIBLE_SSH_ARGS="-i ${SSH_KEY_PATH} -o StrictHostKeyChecking=accept-new"
+            export ANSIBLE_SSH_ARGS='-i ${SSH_KEY_PATH} -o StrictHostKeyChecking=accept-new'
             export ANSIBLE_REMOTE_USER=${ANSIBLE_REMOTE_USER}
 
-            ${VENV_ACTIVATE} -i ${ANSIBLE_INVENTORY} ansible/prod.yml \
-              --tags run_green \
-              --extra-vars "prod_site_tag=${latest_prod_site_tag} prod_site_image=${prod_site_image} green_image_available=true" \
+            ${VENV_ACTIVATE} -i ${ANSIBLE_INVENTORY} ansible/prod.yml \\
+              --tags run_green \\
+              --extra-vars "prod_site_tag=${latest_prod_site_tag} prod_site_image=${prod_site_image} green_image_available=true" \\
               --vault-password-file "${VAULT_PASSFILE}"
-          '''
+          """
         }
 
         script {
@@ -122,18 +120,18 @@ pipeline {
     aborted {
       withCredentials([file(credentialsId: 'ansible-vault-passfile', variable: 'VAULT_PASSFILE')]) {
         script {
-          def currentGreen = sh(script: '''
+          def currentGreen = sh(script: """
             set -e
-            export ANSIBLE_SSH_ARGS="-i ${SSH_KEY_PATH} -o StrictHostKeyChecking=accept-new"
+            export ANSIBLE_SSH_ARGS='-i ${SSH_KEY_PATH} -o StrictHostKeyChecking=accept-new'
             export ANSIBLE_REMOTE_USER=${ANSIBLE_REMOTE_USER}
 
-            ${VENV_ACTIVATE} -i ${ANSIBLE_INVENTORY} ansible/prod.yml \
-              --tags get_green_version \
-              --vault-password-file "${VAULT_PASSFILE}" \
-              -e ansible_shell_type=bash \
-              -e ansible_shell_executable=/bin/bash \
+            ${VENV_ACTIVATE} -i ${ANSIBLE_INVENTORY} ansible/prod.yml \\
+              --tags get_green_version \\
+              --vault-password-file "${VAULT_PASSFILE}" \\
+              -e ansible_shell_type=bash \\
+              -e ansible_shell_executable=/bin/bash \\
             | grep -oE "v[0-9]+\\.[0-9]+\\.[0-9]+"
-          ''', returnStdout: true).trim()
+          """, returnStdout: true).trim()
 
           sendSlackNotification("⚠️ Deployment *aborted*. Current green version remains *${currentGreen}*.")
         }
