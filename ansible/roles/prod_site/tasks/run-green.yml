@@ -27,6 +27,8 @@
       - "{{ prod_site_green_port }}:3000"
     recreate: true
     state: started
+    pull: true
+    force_restart: true
     env:
       NEXT_PUBLIC_APP_VERSION: "{{ prod_site_tag }}"
       NEXT_PUBLIC_CLOUD_PROVIDER: "{{ cloud_provider | upper }}"
