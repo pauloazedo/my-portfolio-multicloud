@@ -1,18 +1,3 @@
-// Jenkinsfile.prod
-
-// Helper: Slack notification
-def sendSlackNotification(String message) {
-  withCredentials([string(credentialsId: 'jenkins-slack-token', variable: 'SLACK_WEBHOOK_URL')]) {
-    writeFile file: 'slack_payload.json', text: """{ "text": "${message}" }"""
-    sh """
-      set -e
-      curl -X POST -H "Content-type: application/json" \
-        --data @slack_payload.json \
-        "${SLACK_WEBHOOK_URL}"
-    """
-  }
-}
-
 pipeline {
   agent any
 
@@ -30,7 +15,6 @@ pipeline {
     stage('Checkout Source') {
       steps {
         checkout scm
-        //echo "Skipping Git checkout – running from inline script"
       }
     }
 
@@ -80,9 +64,11 @@ pipeline {
           '''
         }
 
-        script {
-          sendSlackNotification("🚀 *v${env.latest_prod_site_tag}* deployed to *blue container* and is awaiting approval.")
-        }
+        slackSend(
+          channel: '#jenkins_notifications',
+          color: 'good',
+          message: "🚀 *v${env.latest_prod_site_tag}* deployed to *blue container* and is awaiting approval."
+        )
       }
     }
 
@@ -109,9 +95,11 @@ pipeline {
           '''
         }
 
-        script {
-          sendSlackNotification("✅ *v${env.latest_prod_site_tag}* promoted to *green container* and is now live.")
-        }
+        slackSend(
+          channel: '#jenkins_notifications',
+          color: 'good',
+          message: "✅ *v${env.latest_prod_site_tag}* promoted to *green container* and is now live."
+        )
       }
     }
   }
@@ -133,7 +121,11 @@ pipeline {
             | grep -oE "v[0-9]+\\.[0-9]+\\.[0-9]+"
           ''', returnStdout: true).trim()
 
-          sendSlackNotification("⚠️ Deployment *aborted*. Current green version remains *${currentGreen}*.")
+          slackSend(
+            channel: '#jenkins_notifications',
+            color: 'warning',
+            message: "⚠️ Deployment *aborted*. Current green version remains *${currentGreen}*."
+          )
         }
       }
     }
