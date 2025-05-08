@@ -1,28 +1,19 @@
-// Jenkinsfile.prod
-
-// Helper: Slack notification
-def sendSlackNotification(String message) {
-  withCredentials([string(credentialsId: 'jenkins-slack-token', variable: 'SLACK_WEBHOOK_URL')]) {
-    writeFile file: 'slack_payload.json', text: """{ "text": "${message}" }"""
-    sh '''
-      set -e
-      curl -X POST -H "Content-type: application/json" \
-        --data @slack_payload.json \
-        "$SLACK_WEBHOOK_URL"
-    '''
-  }
-}
-
 pipeline {
   agent any
 
   environment {
     SSH_KEY_PATH        = '/var/jenkins_home/.ssh/id_rsa'
     ANSIBLE_REMOTE_USER = 'devops'
-    CLOUD_PROVIDER      = 'oci'
     ANSIBLE_INVENTORY   = 'ansible/inventory/oci.ini'
+    CLOUD_PROVIDER      = 'oci'
     VENV_ACTIVATE       = '/home/jenkins/venv/bin/ansible-playbook'
-    OCIR_REPO           = 'iad.ocir.io/idtijq8cx4jl/my-portfolio-site'
+    CONTAINER_REPO      = 'iad.ocir.io/idtijq8cx4jl/my-portfolio-site'
+    PROD_APP_URL        = 'https://oci.prod.pauloazedo.dev'
+  }
+
+  options {
+    timestamps()
+    ansiColor('xterm')
   }
 
   stages {
@@ -50,16 +41,16 @@ pipeline {
             script {
               def result = sh(script: '''
                 skopeo list-tags --creds "$OCIR_AUTH" \
-                  docker://iad.ocir.io/idtijq8cx4jl/my-portfolio-site \
+                  docker://${CONTAINER_REPO} \
                 | jq -r .Tags[] \
                 | sort -V \
                 | tail -n1
               ''', returnStdout: true).trim()
 
-              env.latest_prod_site_tag = result
-              env.prod_site_image = "${env.OCIR_REPO}:${result}"
-              echo "✅ Latest OCIR tag: ${env.latest_prod_site_tag}"
-              echo "🖼️ Using image: ${env.prod_site_image}"
+              env.LATEST_TAG = result
+              env.PROD_SITE_IMAGE = "${CONTAINER_REPO}:${result}"
+              echo "✅ Latest OCIR tag: ${env.LATEST_TAG}"
+              echo "🖼️ Using image: ${env.PROD_SITE_IMAGE}"
             }
           }
         }
@@ -76,14 +67,20 @@ pipeline {
 
             ${VENV_ACTIVATE} -i ${ANSIBLE_INVENTORY} ansible/prod.yml \
               --tags run_blue,check_images \
-              --extra-vars "prod_site_tag=${latest_prod_site_tag} \
-                            prod_site_image=${prod_site_image}" \
+              --extra-vars "prod_site_tag=${LATEST_TAG} \
+                            prod_site_image=${PROD_SITE_IMAGE}" \
               --vault-password-file "${VAULT_PASSFILE}"
           '''
         }
 
         script {
-          sendSlackNotification("🚀 *${env.latest_prod_site_tag}* deployed to *blue container* and is awaiting approval.")
+          slackSend(
+            channel: '#jenkins_notifications',
+            color: 'good',
+            message: """🚀 Version `${env.LATEST_TAG}` deployed to *blue container* and is awaiting approval.
+🔗 <${env.BUILD_URL}|View Build>
+🌐 <${env.PROD_APP_URL}/blue|Test Blue Container>"""
+          )
         }
       }
     }
@@ -91,7 +88,7 @@ pipeline {
     stage('Await Manual Approval to Promote GREEN') {
       steps {
         timeout(time: 2, unit: 'HOURS') {
-          input message: "Promote ${env.latest_prod_site_tag} to green?"
+          input message: "Promote v${env.LATEST_TAG} to green?"
         }
       }
     }
@@ -106,14 +103,20 @@ pipeline {
 
             ${VENV_ACTIVATE} -i ${ANSIBLE_INVENTORY} ansible/prod.yml \
               --tags run_green \
-              --extra-vars "prod_site_tag=${latest_prod_site_tag} \
-                            prod_site_image=${prod_site_image}" \
+              --extra-vars "prod_site_tag=${LATEST_TAG} \
+                            prod_site_image=${PROD_SITE_IMAGE}" \
               --vault-password-file "${VAULT_PASSFILE}"
           '''
         }
 
         script {
-          sendSlackNotification("✅ *${env.latest_prod_site_tag}* promoted to *green container* and is now live.")
+          slackSend(
+            channel: '#jenkins_notifications',
+            color: 'good',
+            message: """✅ Version `${env.LATEST_TAG}` *promoted to green* and is now live.
+🔗 <${env.BUILD_URL}|View Build>
+🌐 <${env.PROD_APP_URL}|Open Live Site>"""
+          )
         }
       }
     }
@@ -136,7 +139,11 @@ pipeline {
             | grep -oE "v[0-9]+\\.[0-9]+\\.[0-9]+"
           ''', returnStdout: true).trim()
 
-          sendSlackNotification("⚠️ Deployment *aborted*. Current green version remains *${currentGreen}*.")
+          slackSend(
+            channel: '#jenkins_notifications',
+            color: 'warning',
+            message: "⚠️ Deployment *aborted*. Current green version remains `${currentGreen}`."
+          )
         }
       }
     }
