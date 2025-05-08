@@ -1,3 +1,13 @@
+# ansible/roles/prod_site/tasks/run-blue.yml
+
+#####################################################################
+# Step 0: Ensure target is blue or both
+#####################################################################
+- name: Skip blue deployment if prod_site_target is not 'blue' or 'both'
+  ansible.builtin.meta: end_play
+  when: prod_site_target not in ['blue', 'both']
+  tags: [prod_site, run_blue]
+
 #####################################################################
 # Step 1: Remove existing blue container
 #####################################################################

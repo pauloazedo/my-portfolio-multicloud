@@ -1,3 +1,13 @@
+# ansible/roles/prod_site/tasks/run-green.yml
+
+#####################################################################
+# Step 0: Ensure target is green or both
+#####################################################################
+- name: Skip green deployment if prod_site_target is not 'green' or 'both'
+  ansible.builtin.meta: end_play
+  when: prod_site_target not in ['green', 'both']
+  tags: [prod_site, run_green]
+
 #####################################################################
 # Step 1: Remove existing green container (if any)
 #####################################################################
