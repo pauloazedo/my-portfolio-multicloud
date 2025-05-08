@@ -58,7 +58,7 @@ pipeline {
             export ANSIBLE_REMOTE_USER=${ANSIBLE_REMOTE_USER}
 
             ${VENV_ACTIVATE} -i ${ANSIBLE_INVENTORY} ansible/prod.yml \
-              --tags run_blue \
+              --tags run_blue,check_images \
               --extra-vars "prod_site_tag=${latest_prod_site_tag}" \
               --vault-password-file "${VAULT_PASSFILE}"
           '''
