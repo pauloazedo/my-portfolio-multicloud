@@ -67,15 +67,16 @@ pipeline {
     stage('Deploy Latest Tag to BLUE Container') {
       steps {
         withCredentials([file(credentialsId: 'ansible-vault-passfile', variable: 'VAULT_PASSFILE')]) {
-          sh '''
+          sh """
+            cd ${env.WORKSPACE}
             ${VENV_ACTIVATE} ansible/site.yml \
               -i ${ANSIBLE_INVENTORY} \
               -u ${ANSIBLE_REMOTE_USER} \
               --private-key ${SSH_KEY_PATH} \
-              -e prod_site_tag=${latest_prod_site_tag} \
+              -e prod_site_tag=${env.latest_prod_site_tag} \
               --vault-password-file ${VAULT_PASSFILE} \
               --tags run_blue
-          '''
+          """
         }
 
         script {
@@ -95,15 +96,16 @@ pipeline {
     stage('Promote BLUE to GREEN Container') {
       steps {
         withCredentials([file(credentialsId: 'ansible-vault-passfile', variable: 'VAULT_PASSFILE')]) {
-          sh '''
+          sh """
+            cd ${env.WORKSPACE}
             ${VENV_ACTIVATE} ansible/site.yml \
               -i ${ANSIBLE_INVENTORY} \
               -u ${ANSIBLE_REMOTE_USER} \
               --private-key ${SSH_KEY_PATH} \
-              -e prod_site_tag=${latest_prod_site_tag} \
+              -e prod_site_tag=${env.latest_prod_site_tag} \
               --vault-password-file ${VAULT_PASSFILE} \
               --tags run_green
-          '''
+          """
         }
 
         script {
@@ -117,7 +119,8 @@ pipeline {
     aborted {
       withCredentials([file(credentialsId: 'ansible-vault-passfile', variable: 'VAULT_PASSFILE')]) {
         script {
-          def currentGreen = sh(script: '''
+          def currentGreen = sh(script: """
+            cd ${env.WORKSPACE}
             ${VENV_ACTIVATE} ansible/site.yml \
               -i ${ANSIBLE_INVENTORY} \
               -u ${ANSIBLE_REMOTE_USER} \
@@ -127,7 +130,7 @@ pipeline {
               -e ansible_shell_type=bash \
               -e ansible_shell_executable=/bin/bash \
             | grep -oE "v[0-9]+\\.[0-9]+\\.[0-9]+"
-          ''', returnStdout: true).trim()
+          """, returnStdout: true).trim()
 
           sendSlackNotification("⚠️ Deployment *aborted*. Current green version remains *${currentGreen}*.")
         }
