@@ -29,12 +29,13 @@
   changed_when: false
 
 #####################################################################
-# Step 3: Set single image reference (prod_site_tag)
+# Step 3: Set single image reference from latest tag (only if not passed)
 #####################################################################
 - name: Set image reference from latest tag
   ansible.builtin.set_fact:
     prod_site_tag: "{{ prod_site_image_repo }}:{{ latest_prod_site_tag }}"
   when:
+    - prod_site_tag is not defined
     - latest_prod_site_tag is defined
     - latest_prod_site_tag | length > 0
   tags: always
