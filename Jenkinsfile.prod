@@ -1,10 +1,9 @@
 pipeline {
   agent any
+
   environment {
     CLOUD_PROVIDER = 'oci'
     OCIR_REPO = 'iad.ocir.io/idtijq8cx4jl/my-portfolio-site'
-    OCIR_USERNAME = 'idtijq8cx4jl/devops.user'
-    OCIR_PASSWORD = credentials('ocir-devops-user-token')
     VAULT_PASSFILE = '/var/jenkins_home/.vault_pass.txt'
   }
 
@@ -23,19 +22,21 @@ pipeline {
 
     stage('Discover Latest Tag from OCIR') {
       steps {
-        withCredentials([usernamePassword(credentialsId: 'ocir-devops-user-token', usernameVariable: 'OCIR_USER', passwordVariable: 'OCIR_PASSWORD')]) {
-          withEnv(["OCIR_AUTH=${env.OCIR_USERNAME}:${env.OCIR_PASSWORD}"]) {
-            script {
-              def rawTagList = sh(
-                script: "skopeo list-tags --creds $OCIR_AUTH docker://${env.OCIR_REPO} | jq -r .Tags[] | sort -V | tail -n1",
-                returnStdout: true
-              ).trim()
+        withCredentials([usernamePassword(
+          credentialsId: 'ocir-creds',
+          usernameVariable: 'OCIR_USER',
+          passwordVariable: 'OCIR_PASSWORD'
+        )]) {
+          script {
+            def rawTagList = sh(
+              script: "skopeo list-tags --creds ${OCIR_USER}:${OCIR_PASSWORD} docker://${env.OCIR_REPO} | jq -r .Tags[] | sort -V | tail -n1",
+              returnStdout: true
+            ).trim()
 
-              env.latestTag = rawTagList
-              env.imageTag = "${env.OCIR_REPO}:${env.latestTag}"
-              echo "✅ Latest OCIR tag: ${env.latestTag}"
-              echo "🖼️ Using image: ${env.imageTag}"
-            }
+            env.latestTag = rawTagList
+            env.imageTag = "${env.OCIR_REPO}:${env.latestTag}"
+            echo "✅ Latest OCIR tag: ${env.latestTag}"
+            echo "🖼️ Using image: ${env.imageTag}"
           }
         }
       }
@@ -43,7 +44,7 @@ pipeline {
 
     stage('Deploy Latest Tag to BLUE Container') {
       steps {
-        withCredentials([file(credentialsId: 'ansible-vault-pass', variable: 'VAULT_PASSFILE')]) {
+        withCredentials([file(credentialsId: 'ansible-vault-passfile', variable: 'VAULT_PASSFILE')]) {
           sh """
             /home/jenkins/venv/bin/ansible-playbook \
               -i ansible/inventory/oci.ini ansible/prod.yml \
@@ -70,7 +71,7 @@ pipeline {
 
     stage('Promote BLUE to GREEN') {
       steps {
-        withCredentials([file(credentialsId: 'ansible-vault-pass', variable: 'VAULT_PASSFILE')]) {
+        withCredentials([file(credentialsId: 'ansible-vault-passfile', variable: 'VAULT_PASSFILE')]) {
           sh """
             /home/jenkins/venv/bin/ansible-playbook \
               -i ansible/inventory/oci.ini ansible/prod.yml \
