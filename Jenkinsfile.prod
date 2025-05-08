@@ -67,16 +67,16 @@ pipeline {
     stage('Deploy Latest Tag to BLUE Container') {
       steps {
         withCredentials([file(credentialsId: 'ansible-vault-passfile', variable: 'VAULT_PASSFILE')]) {
-          sh """
-            cd ${env.WORKSPACE}
-            ${VENV_ACTIVATE} ansible/site.yml \
-              -i ${ANSIBLE_INVENTORY} \
-              -u ${ANSIBLE_REMOTE_USER} \
-              --private-key ${SSH_KEY_PATH} \
-              -e prod_site_tag=${env.latest_prod_site_tag} \
-              --vault-password-file ${VAULT_PASSFILE} \
-              --tags run_blue
-          """
+          sh '''
+            set -e
+            export ANSIBLE_SSH_ARGS="-i ${SSH_KEY_PATH} -o StrictHostKeyChecking=accept-new"
+            export ANSIBLE_REMOTE_USER=${ANSIBLE_REMOTE_USER}
+
+            ${VENV_ACTIVATE} -i ${ANSIBLE_INVENTORY} ansible/prod.yml \
+              --tags run_blue \
+              --extra-vars "prod_site_tag=${latest_prod_site_tag}" \
+              --vault-password-file "${VAULT_PASSFILE}"
+          '''
         }
 
         script {
@@ -96,16 +96,16 @@ pipeline {
     stage('Promote BLUE to GREEN Container') {
       steps {
         withCredentials([file(credentialsId: 'ansible-vault-passfile', variable: 'VAULT_PASSFILE')]) {
-          sh """
-            cd ${env.WORKSPACE}
-            ${VENV_ACTIVATE} ansible/site.yml \
-              -i ${ANSIBLE_INVENTORY} \
-              -u ${ANSIBLE_REMOTE_USER} \
-              --private-key ${SSH_KEY_PATH} \
-              -e prod_site_tag=${env.latest_prod_site_tag} \
-              --vault-password-file ${VAULT_PASSFILE} \
-              --tags run_green
-          """
+          sh '''
+            set -e
+            export ANSIBLE_SSH_ARGS="-i ${SSH_KEY_PATH} -o StrictHostKeyChecking=accept-new"
+            export ANSIBLE_REMOTE_USER=${ANSIBLE_REMOTE_USER}
+
+            ${VENV_ACTIVATE} -i ${ANSIBLE_INVENTORY} ansible/prod.yml \
+              --tags run_green \
+              --extra-vars "prod_site_tag=${latest_prod_site_tag}" \
+              --vault-password-file "${VAULT_PASSFILE}"
+          '''
         }
 
         script {
@@ -119,18 +119,18 @@ pipeline {
     aborted {
       withCredentials([file(credentialsId: 'ansible-vault-passfile', variable: 'VAULT_PASSFILE')]) {
         script {
-          def currentGreen = sh(script: """
-            cd ${env.WORKSPACE}
-            ${VENV_ACTIVATE} ansible/site.yml \
-              -i ${ANSIBLE_INVENTORY} \
-              -u ${ANSIBLE_REMOTE_USER} \
-              --private-key ${SSH_KEY_PATH} \
-              --vault-password-file ${VAULT_PASSFILE} \
+          def currentGreen = sh(script: '''
+            set -e
+            export ANSIBLE_SSH_ARGS="-i ${SSH_KEY_PATH} -o StrictHostKeyChecking=accept-new"
+            export ANSIBLE_REMOTE_USER=${ANSIBLE_REMOTE_USER}
+
+            ${VENV_ACTIVATE} -i ${ANSIBLE_INVENTORY} ansible/prod.yml \
               --tags get_green_version \
+              --vault-password-file "${VAULT_PASSFILE}" \
               -e ansible_shell_type=bash \
               -e ansible_shell_executable=/bin/bash \
             | grep -oE "v[0-9]+\\.[0-9]+\\.[0-9]+"
-          """, returnStdout: true).trim()
+          ''', returnStdout: true).trim()
 
           sendSlackNotification("⚠️ Deployment *aborted*. Current green version remains *${currentGreen}*.")
         }
