@@ -63,7 +63,8 @@
       - "{{ prod_site_blue_port }}:3000"
     recreate: true
     state: started
-    env: "{{ prod_site_blue_env | default({}) }}"
+    env:
+      NEXT_PUBLIC_BASE_PATH: "/blue"
   when: not blue_image_available | default(false) | bool
   tags:
     - prod_site
