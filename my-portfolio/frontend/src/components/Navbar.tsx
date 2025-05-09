@@ -69,11 +69,9 @@ const Navbar = () => {
           <Image
             src="/images/logo.png"
             alt="Logo"
-            width={120}
+            width={200}
             height={40}
             priority
-            style={{ width: 'auto', height: 'auto' }}
-            className="h-10 w-auto"
           />
         </a>
 
