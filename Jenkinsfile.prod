@@ -2,9 +2,17 @@ pipeline {
   agent any
 
   environment {
-    CLOUD_PROVIDER = 'oci'
-    OCIR_REPO = 'iad.ocir.io/idtijq8cx4jl/my-portfolio-site'
-    VAULT_PASSFILE = '/var/jenkins_home/.vault_pass.txt'
+    CLOUD_PROVIDER        = 'oci'
+    SSH_KEY_PATH          = '/var/jenkins_home/.ssh/id_rsa'
+    ANSIBLE_REMOTE_USER   = 'devops'
+    VENV_ACTIVATE         = '/home/jenkins/venv/bin/ansible-playbook'
+    OCIR_REPO             = 'iad.ocir.io/idtijq8cx4jl/my-portfolio-site'
+    VAULT_PASSFILE        = '/var/jenkins_home/.vault_pass.txt'
+  }
+
+  options {
+    timestamps()
+    ansiColor('xterm')
   }
 
   stages {
@@ -29,15 +37,18 @@ pipeline {
         )]) {
           withEnv(["OCIR_AUTH=${OCIR_USER}:${OCIR_PASSWORD}"]) {
             script {
-              def rawTagList = sh(
+              def latestTag = sh(
                 script: 'skopeo list-tags --creds "$OCIR_AUTH" docker://${OCIR_REPO} | jq -r .Tags[] | sort -V | tail -n1',
                 returnStdout: true
               ).trim()
 
-              env.latestTag = rawTagList
-              env.imageTag = "${env.OCIR_REPO}:${env.latestTag}"
-              echo "✅ Latest OCIR tag: ${env.latestTag}"
-              echo "🖼️ Using image: ${env.imageTag}"
+              if (!latestTag) {
+                error "❌ No tags found in OCIR repo: ${env.OCIR_REPO}"
+              }
+
+              echo "✅ Latest OCIR tag: ${latestTag}"
+              env.LATEST_PROD_TAG = latestTag
+              env.IMAGE_TAG = "${env.OCIR_REPO}:${latestTag}"
             }
           }
         }
@@ -48,16 +59,14 @@ pipeline {
       steps {
         withCredentials([file(credentialsId: 'ansible-vault-passfile', variable: 'VAULT_PASSFILE')]) {
           sh """
-            /home/jenkins/venv/bin/ansible-playbook \
-              -i ansible/inventory/oci.ini ansible/prod.yml \
-              --tags check_images,run_blue \
-              --extra-vars '{
-                "latest_prod_site_tag": "${latestTag}",
-                "prod_site_tag": "${imageTag}",
-                "prod_site_image": "${imageTag}",
-                "prod_site_target": "blue"
-              }' \
-              --vault-password-file \$VAULT_PASSFILE
+            set -e
+            export ANSIBLE_SSH_ARGS="-i ${SSH_KEY_PATH} -o StrictHostKeyChecking=accept-new"
+            export ANSIBLE_REMOTE_USER=${ANSIBLE_REMOTE_USER}
+
+            ${VENV_ACTIVATE} -i ansible/inventory/oci.ini ansible/prod.yml \\
+              --tags "check_images,run_blue" \\
+              --extra-vars "prod_site_target=blue prod_site_tag=${IMAGE_TAG} prod_site_image=${IMAGE_TAG} latest_prod_site_tag=${LATEST_PROD_TAG}" \\
+              --vault-password-file "${VAULT_PASSFILE}"
           """
         }
       }
@@ -66,7 +75,7 @@ pipeline {
     stage('Await Manual Approval to Promote GREEN') {
       steps {
         timeout(time: 2, unit: 'HOURS') {
-          input message: "Promote v${env.latestTag} to green?"
+          input message: "Promote v${env.LATEST_PROD_TAG} to green?"
         }
       }
     }
@@ -75,16 +84,14 @@ pipeline {
       steps {
         withCredentials([file(credentialsId: 'ansible-vault-passfile', variable: 'VAULT_PASSFILE')]) {
           sh """
-            /home/jenkins/venv/bin/ansible-playbook \
-              -i ansible/inventory/oci.ini ansible/prod.yml \
-              --tags run_green \
-              --extra-vars '{
-                "latest_prod_site_tag": "${latestTag}",
-                "prod_site_tag": "${imageTag}",
-                "prod_site_image": "${imageTag}",
-                "prod_site_target": "green"
-              }' \
-              --vault-password-file \$VAULT_PASSFILE
+            set -e
+            export ANSIBLE_SSH_ARGS="-i ${SSH_KEY_PATH} -o StrictHostKeyChecking=accept-new"
+            export ANSIBLE_REMOTE_USER=${ANSIBLE_REMOTE_USER}
+
+            ${VENV_ACTIVATE} -i ansible/inventory/oci.ini ansible/prod.yml \\
+              --tags "run_green" \\
+              --extra-vars "prod_site_target=green prod_site_tag=${IMAGE_TAG} prod_site_image=${IMAGE_TAG} latest_prod_site_tag=${LATEST_PROD_TAG}" \\
+              --vault-password-file "${VAULT_PASSFILE}"
           """
         }
       }
