@@ -1,10 +1,5 @@
-#####################################################################
-# Step 0: Ensure target is green or both
-#####################################################################
-- name: Skip green deployment if prod_site_target is not 'green' or 'both'
-  ansible.builtin.meta: end_play
-  when: prod_site_target not in ['green', 'both']
-  tags: [prod_site, run_green]
+# ansible/roles/prod_site/tasks/run-green.yml
+# Deploy the PROD Green container using the latest tagged image or fallback
 
 #####################################################################
 # Step 1: Remove existing green container (if any)
@@ -16,48 +11,54 @@
     force_kill: true
   register: green_cleanup
   ignore_errors: true
-  tags: [prod_site, run_green, cleanup]
 
 - name: Log green container cleanup result
   ansible.builtin.debug:
     msg: "Removed existing green container: {{ green_cleanup.changed }}"
-  tags: [prod_site, run_green, cleanup]
 
 #####################################################################
 # Step 2: Run green container with versioned image
 #####################################################################
-- name: Run green container with versioned image ({{ prod_site_image }})
+- name: Run green container with versioned image ({{ latest_prod_site_tag }})
   community.docker.docker_container:
     name: "{{ prod_site_green_container }}"
-    image: "{{ prod_site_image }}"
+    image: "{{ prod_site_green_image }}"
     restart_policy: always
     published_ports:
       - "{{ prod_site_green_port }}:3000"
     recreate: true
     state: started
-    pull: true
-    force_restart: true
-    env:
-      NEXT_PUBLIC_APP_VERSION: "{{ prod_site_tag }}"
-      NEXT_PUBLIC_CLOUD_PROVIDER: "{{ cloud_provider | upper }}"
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3000/"]
-      interval: 30s
-      timeout: 5s
-      retries: 3
-      start_period: 10s
-  when: prod_site_image is defined
-  tags: [prod_site, run_green, deploy]
+  when: green_image_available | bool
+  tags:
+    - prod_site
+    - deploy
 
-#####################################################################
-# Step 3: Persist promoted green version for rollback
-#####################################################################
 - name: Persist promoted green version for rollback
   ansible.builtin.copy:
     dest: /home/devops/last-promoted-green.txt
-    content: "{{ prod_site_tag }}"
+    content: "{{ latest_prod_site_tag }}"
     owner: devops
     group: devops
     mode: '0644'
-  when: prod_site_tag is defined
-  tags: [prod_site, run_green, promote]
+  when: green_image_available | bool
+  tags:
+    - prod_site
+    - promote
+
+#####################################################################
+# Step 3: Run green container with fallback image (if needed)
+#####################################################################
+- name: Run green container with fallback image
+  community.docker.docker_container:
+    name: "{{ prod_site_green_container }}"
+    image: "{{ prod_site_waiting_image }}"
+    restart_policy: always
+    published_ports:
+      - "{{ prod_site_green_port }}:3000"
+    recreate: true
+    state: started
+    env: "{{ prod_site_green_env | default({}) }}"
+  when: not (green_image_available | default(false) | bool)
+  tags:
+    - prod_site
+    - fallback
