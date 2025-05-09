@@ -34,6 +34,10 @@
       timeout: 5s
       retries: 3
       start_period: 10s
+    env:
+      NEXT_PUBLIC_BASE_PATH: "/blue"
+      NEXT_PUBLIC_APP_VERSION: "{{ latest_prod_site_tag }}"
+      NEXT_PUBLIC_CLOUD_PROVIDER: "{{ cloud_provider | upper }}"
   when: blue_image_available | bool
   tags:
     - prod_site
