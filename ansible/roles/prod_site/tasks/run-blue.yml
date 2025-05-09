@@ -1,13 +1,8 @@
-#####################################################################
-# Step 0: Ensure target is blue or both
-#####################################################################
-- name: Skip blue deployment if prod_site_target is not 'blue' or 'both'
-  ansible.builtin.meta: end_play
-  when: prod_site_target not in ['blue', 'both']
-  tags: [prod_site, run_blue]
+# ansible/roles/prod_site/tasks/run-blue.yml
+# Deploy the PROD Blue container using the latest tagged image or fallback
 
 #####################################################################
-# Step 1: Remove existing blue container
+# Step 1: Remove existing blue container (if any)
 #####################################################################
 - name: Remove existing blue container if present
   community.docker.docker_container:
@@ -16,35 +11,56 @@
     force_kill: true
   register: blue_cleanup
   ignore_errors: true
-  tags: [prod_site, run_blue, cleanup]
 
 - name: Log blue container cleanup result
   ansible.builtin.debug:
     msg: "Removed existing blue container: {{ blue_cleanup.changed }}"
-  tags: [prod_site, run_blue, cleanup]
 
 #####################################################################
 # Step 2: Run blue container with versioned image
 #####################################################################
-- name: Run blue container with versioned image ({{ prod_site_image }})
+- name: Run blue container with versioned image ({{ latest_prod_site_tag }})
   community.docker.docker_container:
     name: "{{ prod_site_blue_container }}"
-    image: "{{ prod_site_image }}"
+    image: "{{ prod_site_blue_image }}"
     restart_policy: always
     published_ports:
       - "{{ prod_site_blue_port }}:3000"
     recreate: true
     state: started
-    pull: true
-    force_restart: true
-    env:
-      NEXT_PUBLIC_APP_VERSION: "{{ prod_site_tag }}"
-      NEXT_PUBLIC_CLOUD_PROVIDER: "{{ cloud_provider | upper }}"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3000/"]
       interval: 30s
       timeout: 5s
       retries: 3
       start_period: 10s
-  when: prod_site_image is defined
-  tags: [prod_site, run_blue, deploy]
+  when: blue_image_available | bool
+  tags:
+    - prod_site
+    - deploy
+
+- name: Log skipping blue deploy – image not available
+  ansible.builtin.debug:
+    msg: "Blue image not available — fallback container will be used."
+  when: not blue_image_available | default(false) | bool
+  tags:
+    - prod_site
+    - fallback
+
+#####################################################################
+# Step 3: Run blue container with fallback image (if needed)
+#####################################################################
+- name: Run blue container with fallback image
+  community.docker.docker_container:
+    name: "{{ prod_site_blue_container }}"
+    image: "{{ prod_site_waiting_image }}"
+    restart_policy: always
+    published_ports:
+      - "{{ prod_site_blue_port }}:3000"
+    recreate: true
+    state: started
+    env: "{{ prod_site_blue_env | default({}) }}"
+  when: not blue_image_available | default(false) | bool
+  tags:
+    - prod_site
+    - fallback
