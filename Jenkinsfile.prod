@@ -1,13 +1,14 @@
+// Jenkinsfile.prod
+
 pipeline {
   agent any
 
   environment {
-    CLOUD_PROVIDER        = 'oci'
+    CLOUD_PROVIDER        = "${env.CLOUD_PROVIDER ?: 'oci'}"
     SSH_KEY_PATH          = '/var/jenkins_home/.ssh/id_rsa'
     ANSIBLE_REMOTE_USER   = 'devops'
     VENV_ACTIVATE         = '/home/jenkins/venv/bin/ansible-playbook'
     OCIR_REPO             = 'iad.ocir.io/idtijq8cx4jl/my-portfolio-site'
-    VAULT_PASSFILE        = '/var/jenkins_home/.vault_pass.txt'
   }
 
   options {
@@ -24,7 +25,31 @@ pipeline {
 
     stage('Init Environment') {
       steps {
-        echo "🧭 Using CLOUD_PROVIDER=${env.CLOUD_PROVIDER}"
+        script {
+          echo "🧭 Using CLOUD_PROVIDER=${env.CLOUD_PROVIDER}"
+
+          def cloudVars = [
+            oci: [
+              ANSIBLE_INVENTORY:    'ansible/inventory/oci.ini',
+              ANSIBLE_TARGET_HOST:  'oci.prod.pauloazedo.dev',
+              PROD_APP_URL:         'https://oci.prod.pauloazedo.dev'
+            ],
+            aws: [
+              ANSIBLE_INVENTORY:    'ansible/inventory/aws.ini',
+              ANSIBLE_TARGET_HOST:  'aws.prod.pauloazedo.dev',
+              PROD_APP_URL:         'https://aws.prod.pauloazedo.dev'
+            ]
+          ]
+
+          def selected = cloudVars[env.CLOUD_PROVIDER]
+          if (!selected) {
+            error "❌ Unknown CLOUD_PROVIDER: '${env.CLOUD_PROVIDER}'"
+          }
+
+          env.ANSIBLE_INVENTORY   = selected.ANSIBLE_INVENTORY
+          env.ANSIBLE_TARGET_HOST = selected.ANSIBLE_TARGET_HOST
+          env.PROD_APP_URL        = selected.PROD_APP_URL
+        }
       }
     }
 
@@ -32,24 +57,24 @@ pipeline {
       steps {
         withCredentials([usernamePassword(
           credentialsId: 'ocir-creds',
-          usernameVariable: 'OCIR_USER',
+          usernameVariable: 'OCIR_USERNAME',
           passwordVariable: 'OCIR_PASSWORD'
         )]) {
-          withEnv(["OCIR_AUTH=${OCIR_USER}:${OCIR_PASSWORD}"]) {
-            script {
-              def latestTag = sh(
-                script: 'skopeo list-tags --creds "$OCIR_AUTH" docker://${OCIR_REPO} | jq -r .Tags[] | sort -V | tail -n1',
-                returnStdout: true
-              ).trim()
+          script {
+            def latestTag = sh(
+              script: """
+                skopeo list-tags --creds "$OCIR_USERNAME:$OCIR_PASSWORD" docker://$OCIR_REPO |
+                jq -r '.Tags[]' | sort -V | tail -n1
+              """,
+              returnStdout: true
+            ).trim()
 
-              if (!latestTag) {
-                error "❌ No tags found in OCIR repo: ${env.OCIR_REPO}"
-              }
-
-              echo "✅ Latest OCIR tag: ${latestTag}"
-              env.LATEST_PROD_TAG = latestTag
-              env.IMAGE_TAG = "${env.OCIR_REPO}:${latestTag}"
+            if (!latestTag) {
+              error "❌ No tags found in OCIR repo: ${env.OCIR_REPO}"
             }
+
+            echo "✅ Latest OCIR tag: ${latestTag}"
+            env.LATEST_PROD_TAG = latestTag
           }
         }
       }
@@ -57,17 +82,30 @@ pipeline {
 
     stage('Deploy Latest Tag to BLUE Container') {
       steps {
-        withCredentials([file(credentialsId: 'ansible-vault-passfile', variable: 'VAULT_PASSFILE')]) {
-          sh """
+        withCredentials([file(credentialsId: 'ansible-vault-passfile', variable: 'VAULT_PASS_FILE')]) {
+          sh '''
             set -e
             export ANSIBLE_SSH_ARGS="-i ${SSH_KEY_PATH} -o StrictHostKeyChecking=accept-new"
             export ANSIBLE_REMOTE_USER=${ANSIBLE_REMOTE_USER}
 
-            ${VENV_ACTIVATE} -i ansible/inventory/oci.ini ansible/prod.yml \\
-              --tags "check_images,run_blue" \\
-              --extra-vars "prod_site_target=blue prod_site_tag=${IMAGE_TAG} prod_site_image=${IMAGE_TAG} latest_prod_site_tag=${LATEST_PROD_TAG}" \\
-              --vault-password-file "${VAULT_PASSFILE}"
-          """
+            ${VENV_ACTIVATE} -i ${ANSIBLE_INVENTORY} ansible/prod.yml \
+              --limit prod \
+              --tags "prod_site,fallback" \
+              --extra-vars "prod_site_target=blue latest_prod_site_tag=${LATEST_PROD_TAG}" \
+              --vault-password-file "${VAULT_PASS_FILE}"
+          '''
+        }
+
+        script {
+          slackSend (
+            channel: '#jenkins_notifications',
+            color: '#439FE0',
+            message: """🔵 *Deployed to BLUE container*
+• Version: *${env.LATEST_PROD_TAG}*
+• Environment: *${env.CLOUD_PROVIDER.toUpperCase()}*
+• 🔗 <${env.BUILD_URL}|View Jenkins Build>
+• 🔁 Awaiting manual approval to promote to GREEN..."""
+          )
         }
       }
     }
@@ -75,35 +113,104 @@ pipeline {
     stage('Await Manual Approval to Promote GREEN') {
       steps {
         timeout(time: 2, unit: 'HOURS') {
-          input message: "Promote v${env.LATEST_PROD_TAG} to green?"
+          input message: "Promote BLUE container to GREEN?", ok: "Approve"
+        }
+      }
+
+      post {
+        aborted {
+          withCredentials([file(credentialsId: 'ansible-vault-passfile', variable: 'VAULT_PASS_FILE')]) {
+            script {
+              def output = sh(
+                script: """
+                  set -e
+                  export ANSIBLE_SSH_ARGS="-i ${SSH_KEY_PATH} -o StrictHostKeyChecking=accept-new"
+                  export ANSIBLE_REMOTE_USER=${ANSIBLE_REMOTE_USER}
+
+                  ${VENV_ACTIVATE} -i ${ANSIBLE_INVENTORY} ansible/prod.yml \
+                    --limit prod \
+                    --tags get_green_version \
+                    --extra-vars "cloud_provider=${env.CLOUD_PROVIDER}" \
+                    --vault-password-file "${VAULT_PASS_FILE}" \
+                    | tee /tmp/green-version.out
+                """,
+                returnStatus: false
+              )
+
+              def greenVersionOutput = readFile('/tmp/green-version.out')
+              def match = greenVersionOutput =~ /"current_green_version":\s*"?(v[\d\.]+)"?/
+              def currentVersion = match ? match[0][1] : "unknown"
+
+              slackSend (
+                channel: '#jenkins_notifications',
+                color: 'warning',
+                message: """⚠️ *Approval aborted*
+• Attempted Version: *${env.LATEST_PROD_TAG}*
+• Current GREEN version still running: *${currentVersion}*
+• 🔗 <${env.BUILD_URL}|View Jenkins Build>"""
+              )
+            }
+          }
         }
       }
     }
 
-    stage('Promote BLUE to GREEN') {
+    stage('Promote BLUE to GREEN Container') {
       steps {
-        withCredentials([file(credentialsId: 'ansible-vault-passfile', variable: 'VAULT_PASSFILE')]) {
-          sh """
+        withCredentials([file(credentialsId: 'ansible-vault-passfile', variable: 'VAULT_PASS_FILE')]) {
+          sh '''
             set -e
             export ANSIBLE_SSH_ARGS="-i ${SSH_KEY_PATH} -o StrictHostKeyChecking=accept-new"
             export ANSIBLE_REMOTE_USER=${ANSIBLE_REMOTE_USER}
 
-            ${VENV_ACTIVATE} -i ansible/inventory/oci.ini ansible/prod.yml \\
-              --tags "run_green" \\
-              --extra-vars "prod_site_target=green prod_site_tag=${IMAGE_TAG} prod_site_image=${IMAGE_TAG} latest_prod_site_tag=${LATEST_PROD_TAG}" \\
-              --vault-password-file "${VAULT_PASSFILE}"
-          """
+            ${VENV_ACTIVATE} -i ${ANSIBLE_INVENTORY} ansible/prod.yml \
+              --limit prod \
+              --tags "prod_site,fallback" \
+              --extra-vars "prod_site_target=green latest_prod_site_tag=${LATEST_PROD_TAG}" \
+              --vault-password-file "${VAULT_PASS_FILE}"
+          '''
+        }
+
+        script {
+          slackSend (
+            channel: '#jenkins_notifications',
+            color: 'good',
+            message: """✅ *Promoted to GREEN container*
+• Version: *${env.LATEST_PROD_TAG}*
+• Environment: *${env.CLOUD_PROVIDER.toUpperCase()}*
+• 🔗 <${env.BUILD_URL}|View Jenkins Build>
+• 🌐 <${env.PROD_APP_URL}|Open Live App>"""
+          )
         }
       }
     }
   }
 
   post {
-    failure {
-      echo "🚨 Pipeline failed"
+    success {
+      script {
+        slackSend (
+          channel: '#jenkins_notifications',
+          color: 'good',
+          message: """🎉 *PROD Deployment Completed Successfully*
+• Version: *${env.LATEST_PROD_TAG}*
+• Environment: *${env.CLOUD_PROVIDER.toUpperCase()}*
+• 🔗 <${env.BUILD_URL}|View Jenkins Build>
+• 🌐 <${env.PROD_APP_URL}|Open Live App>"""
+        )
+      }
     }
-    aborted {
-      echo "🛑 Pipeline aborted by user"
+
+    failure {
+      script {
+        slackSend (
+          channel: '#jenkins_notifications',
+          color: 'danger',
+          message: """❌ *PROD Pipeline FAILED*
+• Environment: *${env.CLOUD_PROVIDER.toUpperCase()}*
+• 🔗 <${env.BUILD_URL}|View Jenkins Build>"""
+        )
+      }
     }
   }
 }
