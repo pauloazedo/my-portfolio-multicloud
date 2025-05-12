@@ -42,12 +42,27 @@
         name: "{{ docker_role }}"
       tags: docker
 
-    - name: Include nginx role
+    ############################################################
+    # NGINX Installation and TLS Setup
+    ############################################################
+
+    - name: Install and configure NGINX
+      ansible.builtin.include_tasks: roles/nginx/tasks/main.yml
+      tags: [nginx]
+
+    - name: Issue PROD Let's Encrypt certs
       ansible.builtin.include_role:
         name: nginx
-      tags:
-        - nginx
-        - certbot
+        tasks_from: certbot-prod.yml
+      tags: [certbot, certbot_prod]
+
+    - name: Setup renewal cron for PROD
+      ansible.builtin.include_tasks: roles/nginx/tasks/renew-prod.yml
+      tags: [certbot, renew_prod, certbot_renew, certbot_renew_prod]
+
+    ############################################################
+    # SSH Access (Jenkins -> PROD)
+    ############################################################
 
     - name: Include SSH access setup (Jenkins -> PROD)
       ansible.builtin.include_role:

@@ -1,0 +1,107 @@
+---
+# roles/nginx/tasks/certbot-prod.yml
+# Generate Let's Encrypt certs and update NGINX configs for PROD
+
+- name: Define Certbot domain sets for PROD
+  ansible.builtin.set_fact:
+    nginx_certbot_domains:
+      - domains:
+          - "{{ prod_fqdn }}"
+          - "{{ www_domain }}"
+          - "oci.blue.{{ www_domain | regex_replace('^www\\.', '') }}"
+          - "oci.green.{{ www_domain | regex_replace('^www\\.', '') }}"
+        template: "prod-https-bluegreen.conf.j2"
+        filename: "prod.conf"
+        group: "prod"
+  tags: [certbot, certbot_prod]
+
+- name: Filter PROD domains for this host
+  ansible.builtin.set_fact:
+    certbot_domains_for_host: >-
+      {{ nginx_certbot_domains | selectattr('group', 'in', group_names) | list }}
+  tags: [certbot, certbot_prod]
+
+- name: Gather SAN info from current PROD certs
+  ansible.builtin.shell: |
+    set -o pipefail
+    openssl x509 -in /etc/letsencrypt/live/{{ item.domains[0] }}/cert.pem -noout -text |
+    awk '/Subject Alternative Name/{getline; gsub("DNS:",""); gsub(", ","\n"); print}'
+  args:
+    executable: /bin/bash
+  register: certbot_san_check
+  changed_when: false
+  failed_when: false
+  loop: "{{ certbot_domains_for_host }}"
+  loop_control:
+    label: "{{ item.domains[0] }}"
+  tags: [certbot, certbot_prod]
+
+- name: Init certbot_final_domains (PROD)
+  ansible.builtin.set_fact:
+    certbot_final_domains: []
+  tags: [certbot, certbot_prod]
+
+- name: Append PROD certs to renewal list
+  ansible.builtin.set_fact:
+    certbot_final_domains: "{{ certbot_final_domains + [item.0] }}"
+  when: >
+    item.1.rc != 0 or
+    (
+      item.0.domains | difference(item.1.stdout_lines | map('trim') | list) | length > 0
+    )
+  loop: "{{ certbot_domains_for_host | zip(certbot_san_check.results) | list }}"
+  loop_control:
+    label: "{{ item.0.domains[0] }}"
+  tags: [certbot, certbot_prod]
+
+- name: Debug final cert list for PROD
+  ansible.builtin.debug:
+    var: certbot_final_domains
+  tags: [certbot, certbot_prod]
+
+- name: Debug SAN stdout from existing PROD cert
+  ansible.builtin.debug:
+    msg: "{{ item.item.domains[0] }} SANs:\n{{ item.stdout }}"
+  loop: "{{ certbot_san_check.results }}"
+  loop_control:
+    label: "{{ item.item.domains[0] }}"
+  tags: [certbot, certbot_prod]
+
+- name: Generate or renew PROD certs via Certbot
+  ansible.builtin.command:
+    cmd: >
+      certbot certonly --nginx
+      {% for d in item.domains %}-d {{ d }} {% endfor %}
+      --non-interactive --agree-tos
+      -m paulo@pauloazedo.dev --redirect --expand
+  register: certbot_result
+  changed_when: certbot_result.rc == 0
+  failed_when: certbot_result.rc != 0
+  loop: "{{ certbot_final_domains }}"
+  loop_control:
+    label: "{{ item.domains[0] }}"
+  tags: [certbot, certbot_prod]
+
+- name: Deploy HTTPS NGINX config for PROD
+  ansible.builtin.template:
+    src: "{{ role_path }}/templates/{{ item.template }}"
+    dest: "/etc/nginx/conf.d/{{ item.filename }}"
+    mode: '0644'
+  loop: "{{ certbot_domains_for_host }}"
+  tags: [certbot, certbot_prod, nginx_reload_only]
+
+- name: Reload NGINX service after PROD cert
+  ansible.builtin.service:
+    name: nginx
+    state: reloaded
+  tags: [certbot, certbot_prod, nginx_reload_only]
+
+- name: Notify Slack about PROD certs
+  ansible.builtin.shell: >
+    bash /home/devops/slack-certbot-alert.sh {{ slack_cert_renewal_webhook }} {{ item.item.domains[0] }}
+  args:
+    executable: /bin/bash
+  when: item.rc == 0
+  changed_when: false
+  loop: "{{ certbot_result.results | default([]) }}"
+  tags: [certbot, certbot_prod]

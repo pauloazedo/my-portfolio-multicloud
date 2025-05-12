@@ -1,0 +1,15 @@
+---
+# roles/nginx/tasks/renew-prod.yml
+# Renew PROD certs and notify via Slack
+
+- name: Ensure Certbot renewal via cron (PROD)
+  ansible.builtin.cron:
+    name: "Renew PROD Let's Encrypt certificates"
+    job: >-
+      certbot renew --quiet
+      --deploy-hook "/home/devops/slack-certbot-alert.sh {{ slack_cert_renewal_webhook }} {{ inventory_hostname }}"
+    minute: 30
+    hour: 3
+    user: root
+    cron_file: certbot-renewal-prod
+  tags: [certbot, renew_prod]

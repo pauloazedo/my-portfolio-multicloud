@@ -1,4 +1,5 @@
 ---
+# ansible/roles/nginx/tasks/main.yml
 # NGINX role main task list
 
 ############################################################
@@ -78,14 +79,26 @@
 # Step 6: Generate and configure HTTPS certificates
 ############################################################
 
-- name: Include Certbot tasks
-  ansible.builtin.include_tasks: certbot.yml
-  tags: certbot
+- name: Include Certbot tasks for UAT
+  ansible.builtin.include_tasks: certbot-uat.yml
+  when: "'uat' in group_names"
+  tags: [certbot, certbot_renew, certbot_uat]
+
+- name: Include Certbot tasks for PROD
+  ansible.builtin.include_tasks: certbot-prod.yml
+  when: "'prod' in group_names"
+  tags: [certbot, certbot_renew, certbot_prod]
 
 ############################################################
 # Step 7: Setup automated renewal with Slack alert
 ############################################################
 
-- name: Include Certbot renewal automation
-  ansible.builtin.include_tasks: renew.yml
-  tags: certbot
+- name: Include Certbot renewal tasks for UAT
+  ansible.builtin.include_tasks: renew-uat.yml
+  when: "'uat' in group_names"
+  tags: [certbot, certbot_renew, certbot_renew_uat]
+
+- name: Include Certbot renewal tasks for PROD
+  ansible.builtin.include_tasks: renew-prod.yml
+  when: "'prod' in group_names"
+  tags: [certbot, certbot_renew, certbot_renew_prod]
