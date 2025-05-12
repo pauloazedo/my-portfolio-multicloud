@@ -98,3 +98,25 @@ resource "cloudflare_dns_record" "www" {
   proxied = false
   depends_on = [oci_core_instance.prod]
 }
+
+# === CLOUDFLARE DNS RECORD FOR PROD BLUE CONTAINER ===
+resource "cloudflare_dns_record" "oci_blue" {
+  zone_id = local.cloudflare_zone_id
+  name    = "oci.blue"
+  type    = "A"
+  content = oci_core_instance.prod.public_ip
+  ttl     = 300
+  proxied = false
+  depends_on = [oci_core_instance.prod]
+}
+
+# === CLOUDFLARE DNS RECORD FOR PROD GREEN CONTAINER ===
+resource "cloudflare_dns_record" "oci_green" {
+  zone_id = local.cloudflare_zone_id
+  name    = "oci.green"
+  type    = "A"
+  content = oci_core_instance.prod.public_ip
+  ttl     = 300
+  proxied = false
+  depends_on = [oci_core_instance.prod]
+}

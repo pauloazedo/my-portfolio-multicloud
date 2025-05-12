@@ -1,0 +1,15 @@
+---
+# roles/nginx/tasks/renew-uat.yml
+# Renew UAT certs and notify via Slack
+
+- name: Ensure Certbot renewal via cron (UAT)
+  ansible.builtin.cron:
+    name: "Renew UAT Let's Encrypt certificates"
+    job: >-
+      certbot renew --quiet
+      --deploy-hook "/home/devops/slack-certbot-alert.sh {{ slack_cert_renewal_webhook }} {{ inventory_hostname }}"
+    minute: 0
+    hour: 3
+    user: root
+    cron_file: certbot-renewal-uat
+  tags: [certbot, renew_uat]
