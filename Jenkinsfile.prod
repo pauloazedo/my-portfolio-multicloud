@@ -32,12 +32,26 @@ pipeline {
             oci: [
               ANSIBLE_INVENTORY:    'ansible/inventory/oci.ini',
               ANSIBLE_TARGET_HOST:  'oci.prod.pauloazedo.dev',
-              PROD_APP_URL:         'https://oci.prod.pauloazedo.dev'
+              PROD_APP_URL:         'https://oci.prod.pauloazedo.dev',
+              BLUE_APP_URL:         'https://oci.blue.pauloazedo.dev'
             ],
             aws: [
               ANSIBLE_INVENTORY:    'ansible/inventory/aws.ini',
               ANSIBLE_TARGET_HOST:  'aws.prod.pauloazedo.dev',
-              PROD_APP_URL:         'https://aws.prod.pauloazedo.dev'
+              PROD_APP_URL:         'https://aws.prod.pauloazedo.dev',
+              BLUE_APP_URL:         'https://aws.blue.pauloazedo.dev'
+            ],
+            azure: [
+              ANSIBLE_INVENTORY:    'ansible/inventory/azure.ini',
+              ANSIBLE_TARGET_HOST:  'azure.prod.pauloazedo.dev',
+              PROD_APP_URL:         'https://azure.prod.pauloazedo.dev',
+              BLUE_APP_URL:         'https://azure.blue.pauloazedo.dev'
+            ],
+            gcp: [
+              ANSIBLE_INVENTORY:    'ansible/inventory/gcp.ini',
+              ANSIBLE_TARGET_HOST:  'gcp.prod.pauloazedo.dev',
+              PROD_APP_URL:         'https://gcp.prod.pauloazedo.dev',
+              BLUE_APP_URL:         'https://gcp.blue.pauloazedo.dev'
             ]
           ]
 
@@ -49,6 +63,7 @@ pipeline {
           env.ANSIBLE_INVENTORY   = selected.ANSIBLE_INVENTORY
           env.ANSIBLE_TARGET_HOST = selected.ANSIBLE_TARGET_HOST
           env.PROD_APP_URL        = selected.PROD_APP_URL
+          env.BLUE_APP_URL        = selected.BLUE_APP_URL
         }
       }
     }
@@ -104,6 +119,7 @@ pipeline {
 • Version: *${env.LATEST_PROD_TAG}*
 • Environment: *${env.CLOUD_PROVIDER.toUpperCase()}*
 • 🔗 <${env.BUILD_URL}|View Jenkins Build>
+• 🌐 <${env.BLUE_APP_URL}|Open Blue App>
 • 🔁 Awaiting manual approval to promote to GREEN..."""
           )
         }
